@@ -1,0 +1,163 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "timing": {
+    "comment": "Timing parameters for intersection maneuvers (in seconds)",
+    "forward_clear_time": {
+      "simulation": 0.55,
+      "real": 1.15,
+      "description": "How long to creep forward over the red line before starting the turn"
+    },
+    "exit_timeout": {
+      "simulation": 4.0,
+      "real": 4.0,
+      "description": "Maximum seconds to drive forward after a turn while searching for lane lines"
+    },
+    "turn_time_forward": {
+      "simulation": 2.0,
+      "real": 1.4,
+      "description": "Seconds to drive straight forward through a forward intersection (no turn)"
+    },
+    "turn_time_left": {
+      "simulation": 0.04,
+      "real": 0.7,
+      "description": "Seconds to rotate left at an intersection"
+    },
+    "turn_time_right": {
+      "simulation": 0.15,
+      "real": 0.55,
+      "description": "Seconds to rotate right at an intersection"
+    },
+    "turn_time_turnaround": {
+      "simulation": 0.08,
+      "real": 1.85,
+      "description": "Seconds to rotate for a U-turn (turnaround)"
+    }
+  },
+  "speeds": {
+    "comment": "Motor speed parameters (normalized -1.0 to 1.0)",
+    "motor_bias": {
+      "simulation": 0.0,
+      "real": 0.0,
+      "description": "Bias applied to compensate for motor differences"
+    },
+    "turn_bias_low": {
+      "simulation": 0.1,
+      "real": 0.0,
+      "description": "Lower wheel speed multiplier during turns"
+    },
+    "turn_bias_high": {
+      "simulation": 1.8,
+      "real": 0.0,
+      "description": "Higher wheel speed multiplier during turns"
+    },
+    "creep_speed": {
+      "simulation": 0.06,
+      "real": 0.3,
+      "description": "Speed while slowly driving over the red stop line before turning"
+    },
+    "exit_speed": {
+      "simulation": 0.2,
+      "real": 0.3,
+      "description": "Speed when driving forward after a turn, searching for lane markings"
+    },
+    "turn_speed": {
+      "simulation": 0.2,
+      "real": 0.3,
+      "description": "Speed of each wheel during a left/right rotation at an intersection"
+    }
+  },
+  "lane_following": {
+    "comment": "PID control and lane servoing parameters",
+    "p_gain": 0.1,
+    "d_gain": 0.35,
+    "max_steer": 0.38,
+    "base_speed": 0.21,
+    "min_cruise_speed": 0.17,
+    "min_wheel_speed": 0.08,
+    "turn_speed_ratio": 0.12,
+    "curve_feedforward": 0.12,
+    "curve_threshold": 350,
+    "detection_threshold": 500,
+    "smooth_alpha": 0.6,
+    "steer_smooth": 0.6,
+    "yellow_target": 0.3,
+    "white_target": 0.72,
+    "description": "yellow_target and white_target are the normalized lane position targets (0.0 = left, 1.0 = right)"
+  },
+  "red_line_detection": {
+    "comment": "Red line detection parameters for intersection detection",
+    "window_size": 12,
+    "vote_threshold": 0.65,
+    "arm_frames": 18,
+    "rearm_frames": 20,
+    "roi_top_fraction": 0.55,
+    "min_pixels": 150,
+    "min_aspect_ratio": 2.5,
+    "min_width_fraction": 0.15,
+    "hsv_ranges": {
+      "lower_h_1": 0,
+      "upper_h_1": 10,
+      "lower_h_2": 165,
+      "upper_h_2": 180,
+      "lower_s": 100,
+      "upper_s": 255,
+      "lower_v": 100,
+      "upper_v": 255
+    },
+    "description": "Parameters for detecting red stop lines at intersections. Two H ranges are used to handle red hue wrapping."
+  },
+  "apriltag": {
+    "comment": "AprilTag detection and behavior parameters",
+    "apriltag_enabled": true,
+    "apriltag_interval": 3,
+    "apriltag_min_area": 50.0,
+    "apriltag_stop": true,
+    "apriltag_stop_area": 0.0,
+    "description": "apriltag_enabled: Enable AprilTag detection. apriltag_interval: Process every Nth frame. apriltag_min_area: Minimum area (pixels^2) to consider valid. apriltag_stop: Stop robot when AprilTag is visible. apriltag_stop_area: Minimum area (pixels^2) to trigger stop (0 = any detected tag)."
+  },
+  "object_detection": {
+    "comment": "Object detection parameters for obstacle avoidance",
+    "obstacle_classes": [
+      0,
+      1
+    ],
+    "obstacle_min_area": 2500,
+    "obstacle_zone_y": 0.45,
+    "obstacle_zone_x": [
+      0.15,
+      0.85
+    ],
+    "obstacle_stop_frames": 2,
+    "obstacle_clear_frames": 8,
+    "description": "obstacle_classes: List of class IDs that trigger stopping (0=duckie, 1=truck). obstacle_min_area: Minimum bbox area in pixels to consider. obstacle_zone_y: Bottom edge must reach below this Y fraction. obstacle_zone_x: Horizontal band [left, right] fractions for valid detections."
+  },
+  "hsv_calibration": {
+    "comment": "HSV color ranges for lane line detection",
+    "yellow": {
+      "lower_h": 20,
+      "upper_h": 35,
+      "lower_s": 80,
+      "upper_s": 255,
+      "lower_v": 80,
+      "upper_v": 255,
+      "description": "HSV range for detecting yellow lane lines"
+    },
+    "white": {
+      "lower_h": 0,
+      "upper_h": 180,
+      "lower_s": 0,
+      "upper_s": 50,
+      "lower_v": 150,
+      "upper_v": 255,
+      "description": "HSV range for detecting white lane lines"
+    },
+    "description": "HSV (Hue, Saturation, Value) color ranges for detecting yellow and white lane markings. Adjust these values based on lighting conditions."
+  },
+  "navigation": {
+    "comment": "Navigation state - current start and goal positions",
+    "start_node": 2,
+    "start_direction": "N",
+    "goal_node": 3,
+    "description": "Start node, starting direction (N/E/S/W), and goal node for navigation"
+  }
+}

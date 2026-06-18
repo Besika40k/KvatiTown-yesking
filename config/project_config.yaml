@@ -1,0 +1,19 @@
+# ── Yellow line (centre dashed line) ────────────────────────────────────────
+# Real Duckietown yellow under typical indoor lighting.
+# Hue 18-35 covers warm yellow without bleeding into orange or green.
+yellow_lower_h: 18
+yellow_lower_s: 80
+yellow_lower_v: 100
+yellow_upper_h: 125
+yellow_upper_s: 255
+yellow_upper_v: 255
+
+# ── White line (right edge solid line) ───────────────────────────────────────
+# Low saturation (< 60) + high brightness captures white under varied lighting.
+# Avoids confusing grey floor or coloured walls.
+white_lower_h: 0
+white_lower_s: 0
+white_lower_v: 180
+white_upper_h: 179
+white_upper_s: 94
+white_upper_v: 255
