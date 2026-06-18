@@ -25,4 +25,17 @@ def PIDController(
     prev_int: float,
     delta_t: float,
 ) -> Tuple[float, float, float, float]:
-    raise NotImplementedError("TODO: Implement this function")
+    e = theta_ref - theta_hat
+    e = np.arctan2(np.sin(e), np.cos(e))        # wrap error to [-pi, pi]
+
+    e_int = prev_int + e * delta_t               # accumulate integral
+
+    if delta_t > 0:
+        e_der = (e - prev_e) / delta_t           # finite-difference derivative
+    else:
+        e_der = 0.0
+
+    omega = K_P * e + K_I * e_int + K_D * e_der  # PID output
+    omega = float(np.clip(omega, MIN_OMEGA, MAX_OMEGA))  # clamp to limits
+
+    return float(v_0), omega, float(e), float(e_int)
