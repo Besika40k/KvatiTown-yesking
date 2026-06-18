@@ -8,14 +8,40 @@ from typing import Tuple
 from tasks.visual_lane_servoing.packages import visual_servoing_activity as student
 from tasks.visual_lane_servoing.packages.cuvrve_behavior import detect_curve
 
+
+# ============================================================================
+# AprilTag — optional, disabled when module is missing
+# ============================================================================
+
+class _AprilTagStub:
+    def __init__(self, *args, **kwargs):
+        raise ImportError("AprilTag module not installed")
+
+try:
+    from dt_apriltags import Detector as _AprilTagDetector
+except ImportError:
+    _AprilTagDetector = _AprilTagStub
+
+AprilTagDetector = _AprilTagDetector
+
+
+# ============================================================================
+# CONFIGURATION — file path, sampling constants
+# ============================================================================
+
 _CONFIG_FILE = os.path.normpath(os.path.join(
     os.path.dirname(__file__), '..', '..', '..', 'config', 'lane_servoing_config.yaml'
 ))
 
-_LINE_OFFSET = 160
+_LANE_HALF_WIDTH_DEFAULT = 160
 _ROI_START   = 0.47
 _NUM_SLICES  = 3
-_SLICE_TOL   = 5
+_SLICE_HALF_HEIGHT = 5
+
+
+# ============================================================================
+# SLICE-BASED LINE DETECTION — row-wise x-coordinate averaging
+# ============================================================================
 
 
 def detect_lines_in_slices(
@@ -30,17 +56,22 @@ def detect_lines_in_slices(
     for i in range(_NUM_SLICES):
         y = start_y + i * slice_height + slice_height // 2
 
-        strip_y = mask_yellow[y - _SLICE_TOL: y + _SLICE_TOL, :]
+        strip_y = mask_yellow[y - _SLICE_HALF_HEIGHT: y + _SLICE_HALF_HEIGHT, :]
         idx = np.where(strip_y > 0)[1]
         if len(idx) > 0:
             yellow_xs.append(int(np.mean(idx)))
 
-        strip_w = mask_white[y - _SLICE_TOL: y + _SLICE_TOL, :]
+        strip_w = mask_white[y - _SLICE_HALF_HEIGHT: y + _SLICE_HALF_HEIGHT, :]
         idx = np.where(strip_w > 0)[1]
         if len(idx) > 0:
             white_xs.append(int(np.mean(idx)))
 
     return yellow_xs, white_xs
+
+
+# ============================================================================
+# LANE SERVOING AGENT — PD controller, AprilTag stop, left-turn FSM
+# ============================================================================
 
 
 class LaneServoingAgent:
@@ -68,9 +99,9 @@ class LaneServoingAgent:
         self.apriltag_enabled    = cfg.get('apriltag_enabled',    True)
         self.apriltag_interval   = max(1, int(cfg.get('apriltag_interval', 3)))
         self.apriltag_min_area   = float(cfg.get('apriltag_min_area', 50.0))
-        # If True, halt when any AprilTag is in view.
+        # When True, stop the robot whenever an AprilTag is currently visible.
         self.apriltag_stop       = cfg.get('apriltag_stop',       True)
-        # Minimum tag area (px²) to trigger a stop; 0 = any tag.
+        # Only stop for tags at least this large (pixels^2); 0 = any detected tag.
         self.apriltag_stop_area  = float(cfg.get('apriltag_stop_area', 0.0))
 
         self.frame_count        = 0
@@ -79,7 +110,7 @@ class LaneServoingAgent:
         self._filtered_steering = 0.0
         self._smooth_left       = None
         self._smooth_right      = None
-        self._lane_half_width   = float(_LINE_OFFSET)
+        self._lane_half_width   = float(_LANE_HALF_WIDTH_DEFAULT)
         self.last_debug_info    = self._empty_debug_info(480, 640)
         self.apriltag_detections = []
         self.apriltag_error      = None
@@ -90,20 +121,20 @@ class LaneServoingAgent:
                 self._apriltag_detector = AprilTagDetector(self.apriltag_min_area)
             except Exception as exc:
                 self.apriltag_error = str(exc)
-                print(f"[AprilTag] Disabled: {exc}")
+                print(f"[LaneServo] AprilTag disabled: {exc}")
 
-        # Left-turn FSM: activated when yellow line vanishes at an intersection.
-        # Phase 'straight' – creep forward for a fixed duration.
-        # Phase 'turning'  – steer hard left until the white line returns or timeout.
+        # Left-turn state machine: triggered when yellow disappears (intersection)
+        # Phase 'straight' – drive forward for one lane width
+        # Phase 'turning'  – hard left until white line reappears (or timeout)
         self._yellow_visible_frames  = 0
-        self._left_turn_state        = 'none'   # 'none' | 'straight' | 'turning'
+        self._left_turn_state        = 'idle'
         self._left_turn_start        = 0.0
         self._left_turn_cooldown_end = 0.0
         self._left_straight_duration = cfg.get('left_straight_duration', 1.1)
         self._left_turn_max_duration = cfg.get('left_turn_max_duration',  2.5)
         self._left_straight_speed    = cfg.get('left_straight_speed',     0.23)
-        self._left_turn_wheel_inner  = cfg.get('left_turn_wheel_inner',   0.07)
-        self._left_turn_wheel_outer  = cfg.get('left_turn_wheel_outer',   0.26)
+        self._turn_inner_speed =  cfg.get('left_turn_wheel_inner',   0.07)
+        self._turn_outer_speed =  cfg.get('left_turn_wheel_outer',   0.26)
 
 
     def _calculate_error(self, yellow_xs, white_xs, left_det, right_det, w):
@@ -111,24 +142,24 @@ class LaneServoingAgent:
             y_mean = float(np.mean(yellow_xs))
             w_mean = float(np.mean(white_xs))
 
-            # White appearing left of yellow means we are in the oncoming lane
-            # (e.g. after an intersection). Fall back to yellow-only tracking.
+            # White to the left of yellow -> wrong side (intersection / oncoming lane).
+            # Discard white and follow yellow only.
             if w_mean <= y_mean:
                 error = w / 2.0 - (y_mean + self._lane_half_width)
                 return float(np.clip(error / (w / 2.0), -1.0, 1.0))
 
-            # Both lines visible: adapt lane width estimate and steer toward centre.
+            # Both valid: update lane half-width and track the centre.
             measured = (w_mean - y_mean) / 2.0
             if measured > 20:
                 self._lane_half_width = 0.9 * self._lane_half_width + 0.1 * measured
             error = w / 2.0 - (y_mean + w_mean) / 2.0
 
         elif left_det and yellow_xs:
-            # Yellow line only: position it at lane_half_width left of centre.
+            # Yellow only: keep yellow at lane_half_width to the left of centre.
             error = w / 2.0 - (float(np.mean(yellow_xs)) + self._lane_half_width)
 
         elif right_det and white_xs:
-            # White line only: position it at lane_half_width right of centre.
+            # White only: keep white at lane_half_width to the right of centre.
             error = w / 2.0 - (float(np.mean(white_xs)) - self._lane_half_width)
 
         else:
@@ -145,7 +176,7 @@ class LaneServoingAgent:
     def _cruise_speed(self, steering: float, is_curve: bool, both_visible: bool) -> float:
         return self.base_speed
 
-    def _apply_wheel_floor(self, left: float, right: float) -> Tuple[float, float]:
+    def _floor_wheel_speeds(self, left: float, right: float) -> Tuple[float, float]:
         min_val = min(left, right)
         if min_val < self.min_wheel_speed:
             shift = self.min_wheel_speed - min_val
@@ -173,9 +204,9 @@ class LaneServoingAgent:
         left  = speed - diff
         right = speed + diff
 
-        return self._apply_wheel_floor(left, right)
+        return self._floor_wheel_speeds(left, right)
 
-    def _smooth(self, left: float, right: float) -> Tuple[float, float]:
+    def _smooth_wheel_speeds(self, left: float, right: float) -> Tuple[float, float]:
         alpha = self.smooth_alpha
         if self._smooth_left is None:
             self._smooth_left  = left
@@ -184,6 +215,49 @@ class LaneServoingAgent:
             self._smooth_left  = alpha * left  + (1.0 - alpha) * self._smooth_left
             self._smooth_right = alpha * right + (1.0 - alpha) * self._smooth_right
         return self._smooth_left, self._smooth_right
+
+    def _update_left_turn(self, yellow_slice_count, white_slice_count, now):
+        """Return (left, right) if turn is active, None otherwise."""
+        _YELLOW_MIN_FRAMES = 8
+        if yellow_slice_count > 0:
+            self._yellow_visible_frames = min(self._yellow_visible_frames + 1, 999)
+        else:
+            if (
+                self._yellow_visible_frames >= _YELLOW_MIN_FRAMES
+                and self._left_turn_state == "idle"
+                and now >= self._left_turn_cooldown_end
+            ):
+                self._left_turn_state = "straight"
+                self._left_turn_start = now
+                print("[LaneServo] Yellow gone — left turn: driving straight")
+            self._yellow_visible_frames = 0
+
+        if self._left_turn_state == "straight":
+            elapsed = now - self._left_turn_start
+            if elapsed < self._left_straight_duration:
+                return (self._left_straight_speed, self._left_straight_speed)
+            self._left_turn_state = 'turning'
+            self._left_turn_start = now
+            print("[LaneServo] Left turn: now turning")
+
+        if self._left_turn_state == "turning":
+            elapsed = now - self._left_turn_start
+            white_reappeared = white_slice_count >= 2
+            timed_out = elapsed >= self._left_turn_max_duration
+            if white_reappeared or timed_out:
+                self._left_turn_state        = 'idle'
+                self._left_turn_cooldown_end = now + 3.0
+                self._yellow_visible_frames  = 0
+                reason = "white reappeared" if white_reappeared else "timeout"
+                print(f"[LaneServo] Left turn done ({reason}) — resuming lane follow")
+            else:
+                return (self._turn_inner_speed, self._turn_outer_speed)
+
+        return None
+
+    # =========================================================================
+    # MAIN CONTROL LOOP — lane detect → error → steer → wheel cmd
+    # =========================================================================
 
     def compute_commands(self, image: np.ndarray) -> Tuple[float, float]:
         self.frame_count += 1
@@ -200,18 +274,20 @@ class LaneServoingAgent:
                 if detected_ids != self._last_apriltag_ids:
                     if detected_ids:
                         ids = ", ".join(str(tag_id) for tag_id in detected_ids)
-                        print(f"[AprilTag] Detected ID(s): {ids}")
+                        print(f"[LaneServo] AprilTag detected ID(s): {ids}")
                     elif self._last_apriltag_ids:
-                        print("[AprilTag] Tags no longer visible")
+                        print("[LaneServo] AprilTag no longer visible")
                     self._last_apriltag_ids = detected_ids
             except Exception as exc:
                 self.apriltag_detections = []
                 self.apriltag_error = str(exc)
-                print(f"[AprilTag] Detection error: {exc}")
+                print(f"[LaneServo] AprilTag detection error: {exc}")
 
         # ── Stop on AprilTag ──────────────────────────────────────────────────
-        # Halt when a sufficiently large tag is visible. The persisted detection
-        # list keeps the robot stopped between inference frames.
+        # If any (large-enough) tag is currently visible, halt the robot. This is
+        # the simplest "reacted to the sign" behaviour and an easy way to confirm
+        # detection works on the real bot. Uses the persisted detection list, so
+        # it stays stopped between detection frames too.
         if self.apriltag_stop and self.apriltag_detections:
             if any(tag['area'] >= self.apriltag_stop_area
                    for tag in self.apriltag_detections):
@@ -219,11 +295,11 @@ class LaneServoingAgent:
                 self._filtered_steering = 0.0
                 return 0.0, 0.0
 
-        # ── Lane detection via student module ─────────────────────────────────
+        # ── 1. Lane detection ────────────────────────────────────────────────
         try:
             mask_left, mask_right = student.detect_lane_markings(bgr)
         except Exception as e:
-            print(f"[Agent] detect_lane_markings error: {e}")
+            print(f"[LaneServo] detect_lane_markings error: {e}")
             return 0.0, 0.0
 
         mask_y = (mask_left  * 255).astype(np.uint8)
@@ -242,7 +318,7 @@ class LaneServoingAgent:
         yellow_slice_count = len(yellow_xs)
         white_slice_count  = len(white_xs)
 
-        # ── Debug visualisation (always built) ───────────────────────────────
+        # ── Always update debug visualizations ───────────────────────────────
         combined = np.clip(mask_left + mask_right, 0, 1)
         slice_height = int(h * 0.35 / _NUM_SLICES)
         start_y      = int(h * _ROI_START)
@@ -267,46 +343,13 @@ class LaneServoingAgent:
             'apriltag_error':    self.apriltag_error,
         }
 
-        # ── Yellow-line loss triggers left-turn sequence ──────────────────────
-        _YELLOW_MIN_FRAMES = 8
-        if yellow_slice_count > 0:
-            self._yellow_visible_frames = min(self._yellow_visible_frames + 1, 999)
-        else:
-            if (self._yellow_visible_frames >= _YELLOW_MIN_FRAMES
-                    and self._left_turn_state == 'none'
-                    and now >= self._left_turn_cooldown_end):
-                self._left_turn_state = 'straight'
-                self._left_turn_start = now
-                print("[Agent] Yellow gone — left turn: driving straight")
-            self._yellow_visible_frames = 0
-
-        # ── Left-turn FSM ─────────────────────────────────────────────────────
-        if self._left_turn_state == 'straight':
-            elapsed = now - self._left_turn_start
-            if elapsed < self._left_straight_duration:
-                s = self._left_straight_speed
-                return s, s
-            self._left_turn_state = 'turning'
-            self._left_turn_start = now
-            print("[Agent] Left turn: now turning")
-
-        if self._left_turn_state == 'turning':
-            elapsed = now - self._left_turn_start
-            white_reappeared = white_slice_count >= 2
-            timed_out        = elapsed >= self._left_turn_max_duration
-            if white_reappeared or timed_out:
-                self._left_turn_state        = 'none'
-                self._left_turn_cooldown_end = now + 3.0
-                self._yellow_visible_frames  = 0
-                reason = "white reappeared" if white_reappeared else "timeout"
-                print(f"[Agent] Left turn done ({reason}) — resuming lane follow")
-            else:
-                return self._left_turn_wheel_inner, self._left_turn_wheel_outer
-        # ─────────────────────────────────────────────────────────────────────
+        turn_result = self._update_left_turn(yellow_slice_count, white_slice_count, now)
+        if turn_result is not None:
+            return turn_result
 
         recovery  = total_pixels < self.detection_threshold
 
-        # White-left-of-yellow means the bot is in the opposing lane — discard white.
+        # White to the left of yellow means wrong-side detection — treat as yellow-only.
         white_on_wrong_side = (
             left_det and right_det
             and yellow_xs and white_xs
@@ -315,7 +358,7 @@ class LaneServoingAgent:
         effective_right_det = right_det and not white_on_wrong_side
         both_visible        = left_det and effective_right_det and not recovery
 
-        # Curve detection: use yellow when white is on the wrong side.
+        # Curve detection: prefer yellow when white is discarded.
         is_curve, curve_dir = detect_curve(
             yellow_xs,
             white_xs if not white_on_wrong_side else [],
@@ -335,7 +378,7 @@ class LaneServoingAgent:
         left, right = self._motor_commands(
             self._filtered_steering, recovery, both_visible, is_curve,
         )
-        left, right = self._smooth(left, right)
+        left, right = self._smooth_wheel_speeds(left, right)
 
         self.last_debug_info.update({
             'is_curve':  is_curve,
@@ -346,7 +389,11 @@ class LaneServoingAgent:
 
         return left, right
 
-    def step(self, image: np.ndarray, wheels_driver) -> Tuple[float, float]:
+    # =========================================================================
+    # EXTERNAL API
+    # =========================================================================
+
+    def step_and_drive(self, image: np.ndarray, wheels_driver) -> Tuple[float, float]:
         left, right = self.compute_commands(image)
         wheels_driver.set_wheels_speed(left, right)
         return left, right
@@ -358,15 +405,15 @@ class LaneServoingAgent:
         self._filtered_steering      = 0.0
         self._smooth_left            = None
         self._smooth_right           = None
-        self._lane_half_width        = float(_LINE_OFFSET)
+        self._lane_half_width        = float(_LANE_HALF_WIDTH_DEFAULT)
         self._yellow_visible_frames  = 0
-        self._left_turn_state        = 'none'
+        self._left_turn_state        = 'idle'
         self._left_turn_start        = 0.0
         self._left_turn_cooldown_end = 0.0
         self.apriltag_detections     = []
         self.apriltag_error          = None
         self._last_apriltag_ids      = ()
-        print("[Agent] State reset")
+        print("[LaneServo] State reset")
 
     def get_debug_info(self, image: np.ndarray) -> dict:
         return self.last_debug_info
