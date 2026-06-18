@@ -2,15 +2,20 @@ from typing import List, Tuple
 import numpy as np
 
 
+# ============================================================================
+# CURVE DETECTION — slice shift analysis
+# ============================================================================
+
+
 def detect_curve(
     yellow_xs: List[int],
     white_xs:  List[int],
-    curve_threshold: int = 350,
+    shift_threshold: int = 350,
 ) -> Tuple[bool, int]:
-    # xs[0] is closest to the robot, xs[-1] farthest ahead.
-    # If a line shifts by > curve_threshold pixels between near and far,
-    # the road is curving. The sign tells direction:
-    #   +1 = right curve, -1 = left curve, 0 = straight.
+    """
+    xs[0] is nearest to the robot; xs[-1] is farthest ahead.
+    Returns (is_curve, direction) where direction: +1 = right, -1 = left, 0 = none.
+    """
     shift = None
 
     if len(yellow_xs) >= 2:
@@ -18,7 +23,7 @@ def detect_curve(
     elif len(white_xs) >= 2:
         shift = white_xs[-1] - white_xs[0]
 
-    if shift is None or abs(shift) < curve_threshold:
+    if shift is None or abs(shift) < shift_threshold:
         return False, 0
 
     direction = 1 if shift > 0 else -1
