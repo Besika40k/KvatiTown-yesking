@@ -1,0 +1,1 @@
+FOR Robot to work, maps should be copied here too

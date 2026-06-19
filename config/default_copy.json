@@ -1,0 +1,39 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "navigation": {
+    "start_node": 2,
+    "start_direction": "N",
+    "goal_node": 3
+  },
+  "lane_control": {
+    "p_gain": 1.15,
+    "d_gain": 0.25,
+    "base_speed": 0.1
+  },
+  "timing": {
+    "creep_time": 1.0,
+    "exit_timeout": 6.5,
+    "forward_through": 0.2,
+    "left_turn": 2.15,
+    "right_turn": 0.8,
+    "turnaround": 3.2
+  },
+  "hsv_calibration": {
+    "yellow": {
+      "lower_h": 76,
+      "upper_h": 59,
+      "lower_s": 74,
+      "upper_s": 231,
+      "lower_v": 49,
+      "upper_v": 240
+    },
+    "white": {
+      "lower_h": 29,
+      "upper_h": 179,
+      "lower_s": 0,
+      "upper_s": 47,
+      "lower_v": 137,
+      "upper_v": 255
+    }
+  }
+}

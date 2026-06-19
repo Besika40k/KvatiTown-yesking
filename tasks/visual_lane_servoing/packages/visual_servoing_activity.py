@@ -4,11 +4,6 @@ import numpy as np
 import cv2
 import yaml
 
-
-# ============================================================================
-# LANE MARKING DETECTION — Sobel edges + HSV color masks
-# ============================================================================
-
 _HSV_FILE = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'config', 'lane_servoing_hsv_config.yaml')
 try:
     with open(_HSV_FILE) as _f:
@@ -39,6 +34,7 @@ def detect_lane_markings(image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
     mask_yellow_color = cv2.inRange(hsv, _yellow_lower, _yellow_upper)
     mask_white_color = cv2.inRange(hsv, _white_lower, _white_upper)
 
+    # NO half-image masks — color alone distinguishes the two lines
     mask_left = (
             edge_mask
             & (sobelx < 0)

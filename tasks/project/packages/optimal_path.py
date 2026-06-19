@@ -1,12 +1,8 @@
 import heapq
 import math
+from pickletools import optimize
 
 from tasks.project.packages.road_map import road_map
-
-
-# ============================================================================
-# PATHFINDING — Dijkstra on road graph with compass heading
-# ============================================================================
 
 # Compass directions in clockwise order — used for turn calculation.
 _CLOCKWISE = ["N", "E", "S", "W"]
@@ -39,56 +35,55 @@ def apply_maneuver(heading, maneuver):
     return _CLOCKWISE[(idx + delta.get(maneuver, 0)) % 4]
 
 
-def reconstruct_path(predecessor_map, start_node, goal_node):
-    """Walk predecessor_map from goal back to start to build the path."""
+def reconstruct_path(previous, start, goal):
     path = []
-    current = goal_node
+    current = goal
 
     while current is not None:
         path.append(current)
-        if current == start_node:
+        if current == start:
             break
-        current = predecessor_map.get(current)
+        current = previous.get(current)
 
     path.reverse()
 
-    if not path or path[0] != start_node:
+    if not path or path[0] != start:
         return []
 
     return path
 
 
-def dijkstra(start_node, goal_node, start_heading="N", road_graph=road_map):
-    if start_node not in road_graph.nodes:
-        raise ValueError(f"Start node {start_node} does not exist")
+def dijkstra(start, goal, start_heading="N", graph=road_map):
+    if start not in graph.nodes:
+        raise ValueError(f"Start node {start} does not exist")
 
-    if goal_node not in road_graph.nodes:
-        raise ValueError(f"Goal node {goal_node} does not exist")
+    if goal not in graph.nodes:
+        raise ValueError(f"Goal node {goal} does not exist")
 
-    distance_map = {node: math.inf for node in road_graph.get_all_nodes()}
-    predecessor_map = {node: None for node in road_graph.get_all_nodes()}
+    distances = {node: math.inf for node in graph.all_nodes()}
+    previous = {node: None for node in graph.all_nodes()}
 
-    distance_map[start_node] = 0
-    priority_queue = [(0, start_node)]
+    distances[start] = 0
+    pq = [(0, start)]
 
-    while priority_queue:
-        current_distance, current_node = heapq.heappop(priority_queue)
+    while pq:
+        current_distance, current_node = heapq.heappop(pq)
 
-        if current_distance > distance_map[current_node]:
+        if current_distance > distances[current_node]:
             continue
 
-        if current_node == goal_node:
+        if current_node == goal:
             break
 
-        for neighbor, length, edge_id in road_graph.filter_shortest_neighbors(current_node):
+        for neighbor, length, edge_id in graph.all_neighbors_shortest(current_node):
             new_distance = current_distance + length
 
-            if new_distance < distance_map[neighbor]:
-                distance_map[neighbor] = new_distance
-                predecessor_map[neighbor] = current_node
-                heapq.heappush(priority_queue, (new_distance, neighbor))
+            if new_distance < distances[neighbor]:
+                distances[neighbor] = new_distance
+                previous[neighbor] = current_node
+                heapq.heappush(pq, (new_distance, neighbor))
 
-    path = reconstruct_path(predecessor_map, start_node, goal_node)
+    path = reconstruct_path(previous, start, goal)
 
     if not path:
         return {
@@ -98,32 +93,33 @@ def dijkstra(start_node, goal_node, start_heading="N", road_graph=road_map):
             "distance": math.inf,
         }
 
-    edge_ids = []
+    # Build edge list and compute the maneuver at each intersection.
+    edges = []
     directions = []
     heading = start_heading
 
-    for from_node, to_node in zip(path, path[1:]):
-        shortest_edge = road_graph.shortest_edge(from_node, to_node)
-        if shortest_edge is None:
-            raise ValueError(f"No edge between {from_node} and {to_node}")
-        edge_id, _length = shortest_edge
-        edge_ids.append(edge_id)
+    for a, b in zip(path, path[1:]):
+        shortest = graph.shortest_edge(a, b)
+        if shortest is None:
+            raise ValueError(f"No edge between {a} and {b}")
+        edge_id, _ = shortest
+        edges.append(edge_id)
 
-        edge_data = road_graph.get_edge(edge_id)
-        if edge_data["from"] == from_node:
+        edge_data = graph.get_edge(edge_id)
+        if edge_data["from"] == a:
             exit_dir = edge_data["direction1"]
         else:
             exit_dir = edge_data["direction2"]
 
         maneuver = compute_maneuver(heading, exit_dir)
         directions.append(maneuver)
-        heading = exit_dir
+        heading = exit_dir  # robot's heading after traversing this edge
 
     return {
         "path": path,
-        "edges": edge_ids,
+        "edges": edges,
         "directions": directions,
-        "distance": distance_map[goal_node],
+        "distance": distances[goal],
     }
 
 
@@ -131,33 +127,46 @@ if __name__ == "__main__":
     print("=" * 80)
     print("Testing ALL possible combinations of Dijkstra pathfinding")
     print("=" * 80)
+    print()
 
+    # All nodes in the graph
     nodes = [1, 2, 3]
+
+    # All valid headings
     headings = ["N", "E", "S", "W"]
+
+    # Test all combinations where start != goal
     combination_count = 0
 
     for start in nodes:
         for goal in nodes:
             if start == goal:
-                continue
+                continue  # Skip same start/goal
+
             for heading in headings:
                 combination_count += 1
                 print(f"\n{'─' * 80}")
-                print(f"Combo #{combination_count}: {start} → {goal}, heading={heading}")
+                print(
+                    f"Combination #{combination_count}: Start={start}, Goal={goal}, Heading={heading}"
+                )
                 print(f"{'─' * 80}")
 
                 try:
                     result = dijkstra(start, goal, heading)
+
                     if result["path"]:
+                        print(f"✓ Path found!")
                         print(f"  Path:       {' → '.join(map(str, result['path']))}")
                         print(f"  Edges:      {result['edges']}")
                         print(f"  Directions: {result['directions']}")
                         print(f"  Distance:   {result['distance']:.1f}")
                     else:
-                        print(f"  No path found")
+                        print(f"✗ No path found")
+                        print(f"  Distance:   {result['distance']}")
+
                 except Exception as e:
-                    print(f"  Error: {e}")
+                    print(f"✗ Error: {e}")
 
     print(f"\n{'=' * 80}")
     print(f"Total combinations tested: {combination_count}")
-    print(f"{'=' * 80}\n")
+    print(f"={'=' * 80}\n")

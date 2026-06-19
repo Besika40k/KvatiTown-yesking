@@ -10,3 +10,4 @@ pyserial
 jupyter
 matplotlib
 onnxruntime
+godot-parser

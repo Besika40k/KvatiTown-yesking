@@ -23,32 +23,55 @@ Usage:
 
 import json
 import os
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 
 class ConfigProvider:
     """Centralized configuration provider with support for nested keys and environment detection."""
 
-    def __init__(self, config_path: Optional[str] = None):
+    def __init__(self, config_path: Optional[str] = None, bot_name: str = "default"):
         """
         Initialize the configuration provider.
 
         Args:
             config_path: Path to the configuration JSON file. If None, uses default location.
+            bot_name: Name of the bot configuration to load (default: "default")
         """
-        if config_path is None:
-            # Default path relative to this file
-            config_dir = os.path.dirname(os.path.abspath(__file__)) + "/bots"
-            config_path = os.path.join(config_dir, "bot_default.json")
+        self._bot_name = bot_name
+        self.config_dir = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "bots"
+        )
 
-        self._bot_name = "default"
+        if config_path is None:
+            config_path = os.path.join(self.config_dir, f"{bot_name}.json")
+
         self.config_path = config_path
         self._config: Dict[str, Any] = {}
         self._is_real: Optional[bool] = None
         self._load_config()
         self._detect_environment()
 
-    def _load_config(self):
+    def _get_config_path(self, bot_name: str = "default"):
+        config_dir = os.path.dirname(os.path.abspath(__file__)) + "/bots"
+        config_path = os.path.join(config_dir, f"{bot_name}.json")
+        return config_path
+
+    def get_bots(self) -> List[str]:
+        """Return list of available bot configuration names."""
+        try:
+            files = os.listdir(self.config_dir)
+            return sorted(
+                [f.replace(".json", "") for f in files if f.endswith(".json")]
+            )
+        except Exception as e:
+            print(f"[ConfigProvider] Error listing bots: {e}")
+            return ["default"]
+
+    def get_current_bot_name(self) -> str:
+        """Return the currently loaded bot name."""
+        return self._bot_name
+
+    def _load_config(self, robot_name: Optional[str] = None):
         """Load configuration from JSON file."""
         try:
             with open(self.config_path, "r") as f:
@@ -131,58 +154,41 @@ class ConfigProvider:
 
         return value
 
-    def get_speed(self, speed_name: str, default: Any = None) -> float:
+    def get_navigation(self) -> Dict[str, Any]:
         """
-        Get a speed parameter, automatically selecting simulation or real value.
-
-        Args:
-            speed_name: Name of the speed parameter (e.g., 'creep_speed', 'turn_speed')
-            default: Default value if not found
+        Get navigation configuration (start_node, start_direction, goal_node).
 
         Returns:
-            Speed value appropriate for current environment
+            Dictionary with navigation parameters
 
         Example:
-            >>> config.get_speed('creep_speed')
-            0.06  # if in simulation
-            0.3   # if on real robot
+            >>> config.get_navigation()
+            {'start_node': 2, 'start_direction': 'N', 'goal_node': 3}
         """
-        speeds = self._config.get("speeds", {})
-        speed_config = speeds.get(speed_name, {})
+        return self._config.get("navigation", {})
 
-        if isinstance(speed_config, dict):
-            env_key = "real" if self.is_real else "simulation"
-            return speed_config.get(env_key, default)
-
-        # If it's a direct value (not environment-specific)
-        return speed_config if speed_config is not None else default
-
-    def get_timing(self, timing_name: str, default: Any = None) -> float:
+    def set_navigation(
+        self, start_node: int = None, start_direction: str = None, goal_node: int = None
+    ):
         """
-        Get a timing parameter, automatically selecting simulation or real value.
+        Update navigation parameters.
 
         Args:
-            timing_name: Name of the timing parameter (e.g., 'turn_time_left')
-            default: Default value if not found
-
-        Returns:
-            Timing value appropriate for current environment
+            start_node: Starting intersection node ID
+            start_direction: Starting direction ('N', 'E', 'S', 'W')
+            goal_node: Goal intersection node ID
 
         Example:
-            >>> config.get_timing('turn_time_left')
-            0.04  # if in simulation
-            0.7   # if on real robot
+            >>> config.set_navigation(start_node=2, start_direction='N', goal_node=3)
         """
-        timings = self._config.get("timing", {})
-        timing_config = timings.get(timing_name, {})
+        if start_node is not None:
+            self.set("navigation.start_node", start_node)
+        if start_direction is not None:
+            self.set("navigation.start_direction", start_direction)
+        if goal_node is not None:
+            self.set("navigation.goal_node", goal_node)
 
-        if isinstance(timing_config, dict):
-            env_key = "real" if self.is_real else "simulation"
-            return timing_config.get(env_key, default)
-
-        return timing_config if timing_config is not None else default
-
-    def get_hsv_range(self, color) -> dict[str, int]:
+    def get_hsv_range(self, color) -> Dict[str, int]:
         """
         Get HSV range for a specific color.
 
@@ -236,50 +242,101 @@ class ConfigProvider:
         for key, value in hsv_dict.items():
             self.set(f"hsv_calibration.{color}.{key}", int(value))
 
-    def get_lane_following(self) -> Dict[str, float]:
+    def get_hsv_calibration(self) -> Dict[str, Dict[str, int]]:
         """
-        Get all lane following parameters as a dictionary.
+        Get all HSV calibration parameters.
 
         Returns:
-            Dictionary with all lane following parameters
-        """
-        return self._config.get("lane_following", {})
+            Dictionary with 'yellow' and 'white' HSV ranges
 
-    def get_red_line_detection(self) -> Dict[str, Any]:
+        Example:
+            >>> config.get_hsv_calibration()
+            {'yellow': {...}, 'white': {...}}
         """
-        Get all red line detection parameters as a dictionary.
+        return self._config.get("hsv_calibration", {})
 
-        Returns:
-            Dictionary with all red line detection parameters
+    def get_lane_control(self) -> Dict[str, float]:
         """
-        return self._config.get("red_line_detection", {})
-
-    def get_object_detection(self) -> Dict[str, Any]:
-        """
-        Get all object detection parameters as a dictionary.
+        Get lane control parameters (PID and speed).
 
         Returns:
-            Dictionary with all object detection parameters
-        """
-        return self._config.get("object_detection", {})
+            Dictionary with p_gain, d_gain, base_speed
 
-    def get_apriltag(self) -> Dict[str, Any]:
+        Example:
+            >>> config.get_lane_control()
+            {'p_gain': 0.60, 'd_gain': 0.80, 'base_speed': 0.21}
         """
-        Get all AprilTag detection parameters as a dictionary.
+        defaults = {"p_gain": 0.60, "d_gain": 0.80, "base_speed": 0.21}
+        return self._config.get("lane_control", defaults)
+
+    def set_lane_control(
+        self, p_gain: float = None, d_gain: float = None, base_speed: float = None
+    ):
+        """
+        Update lane control parameters.
+
+        Args:
+            p_gain: Proportional gain for PID controller
+            d_gain: Derivative gain for PID controller
+            base_speed: Base driving speed
+
+        Example:
+            >>> config.set_lane_control(p_gain=0.65, d_gain=0.85)
+        """
+        if p_gain is not None:
+            self.set("lane_control.p_gain", float(p_gain))
+        if d_gain is not None:
+            self.set("lane_control.d_gain", float(d_gain))
+        if base_speed is not None:
+            self.set("lane_control.base_speed", float(base_speed))
+
+    def get_timing(self) -> Dict[str, float]:
+        """
+        Get intersection timing parameters.
 
         Returns:
-            Dictionary with all AprilTag parameters
-        """
-        return self._config.get("apriltag", {})
+            Dictionary with timing parameters (creep_time, exit_timeout, etc.)
 
-    def get_road_map(self) -> Dict[str, Any]:
+        Example:
+            >>> config.get_timing()
+            {'creep_time': 0.80, 'exit_timeout': 4.0, ...}
         """
-        Get road map configuration (nodes and edges).
+        defaults = {
+            "creep_time": 0.80,
+            "exit_timeout": 4.0,
+            "forward_through": 1.0,
+            "left_turn": 1.10,
+            "right_turn": 0.80,
+            "turnaround": 3.20,
+        }
+        return self._config.get("timing", defaults)
 
-        Returns:
-            Dictionary with 'nodes' and 'edges'
+    def set_timing(self, **kwargs):
         """
-        return self._config.get("road_map", {})
+        Update timing parameters.
+
+        Args:
+            creep_time: Time to creep forward at intersection
+            exit_timeout: Timeout for exiting intersection
+            forward_through: Time to drive straight through
+            left_turn: Time for left turn
+            right_turn: Time for right turn
+            turnaround: Time for U-turn
+
+        Example:
+            >>> config.set_timing(left_turn=1.15, right_turn=0.85)
+        """
+        valid_keys = [
+            "creep_time",
+            "exit_timeout",
+            "forward_through",
+            "left_turn",
+            "right_turn",
+            "turnaround",
+        ]
+        for key, value in kwargs.items():
+            if key in valid_keys:
+                self.set(f"timing.{key}", float(value))
 
     def set(self, key: str, value: Any):
         """
@@ -321,24 +378,43 @@ class ConfigProvider:
         for key, value in updates.items():
             self.set(key, value)
 
-    def save(self, path: Optional[str] = None):
+    def save(self, bot_name: Optional[str] = None):
         """
         Save current configuration to JSON file.
 
         Args:
-            path: Path to save to. If None, uses the original config path.
+            bot_name: Name of bot config to save to. If None, saves to current bot.
         """
-        save_path = path or self.config_path
+        if bot_name is None:
+            save_path = self.config_path
+        else:
+            save_path = os.path.join(self.config_dir, f"{bot_name}.json")
+            self._bot_name = bot_name
+            self.config_path = save_path
 
         try:
             with open(save_path, "w") as f:
                 json.dump(self._config, f, indent=2)
-            print(f"[ConfigProvider] Configuration saved to: {save_path}")
+            print(
+                f"[ConfigProvider] Configuration saved to: {save_path} (bot: {self._bot_name})"
+            )
         except Exception as e:
             print(f"[ConfigProvider] ERROR: Failed to save config: {e}")
 
+    def load(self, bot_name: str):
+        """
+        Load a different bot configuration.
+
+        Args:
+            bot_name: Name of the bot configuration to load
+        """
+        self._bot_name = bot_name
+        self.config_path = os.path.join(self.config_dir, f"{bot_name}.json")
+        self._load_config()
+        print(f"[ConfigProvider] Loaded bot configuration: {bot_name}")
+
     def reload(self):
-        """Reload configuration from file."""
+        """Reload configuration from current file."""
         self._load_config()
         self._detect_environment()
 
@@ -368,7 +444,7 @@ def get_config() -> ConfigProvider:
 
 def reload_config():
     """Reload the global configuration from file."""
-    config.reload()
+    config.load()
 
 
 if __name__ == "__main__":
@@ -384,28 +460,10 @@ if __name__ == "__main__":
     print()
 
     print("Navigation settings:")
-    print(f"  Start node: {config.get('navigation.start_node')}")
-    print(f"  Goal node: {config.get('navigation.goal_node')}")
-    print(f"  Start direction: {config.get('navigation.start_direction')}")
-    print()
-
-    print("Speed parameters:")
-    print(f"  Creep speed: {config.get_speed('creep_speed')}")
-    print(f"  Exit speed: {config.get_speed('exit_speed')}")
-    print(f"  Turn speed: {config.get_speed('turn_speed')}")
-    print()
-
-    print("Timing parameters:")
-    print(f"  Forward clear time: {config.get_timing('forward_clear_time')}")
-    print(f"  Turn time left: {config.get_timing('turn_time_left')}")
-    print(f"  Turn time right: {config.get_timing('turn_time_right')}")
-    print()
-
-    print("Lane following:")
-    lane_config = config.get_lane_following()
-    print(f"  P gain: {lane_config.get('p_gain')}")
-    print(f"  D gain: {lane_config.get('d_gain')}")
-    print(f"  Base speed: {lane_config.get('base_speed')}")
+    nav_config = config.get_navigation()
+    print(f"  Start node: {nav_config.get('start_node')}")
+    print(f"  Goal node: {nav_config.get('goal_node')}")
+    print(f"  Start direction: {nav_config.get('start_direction')}")
     print()
 
     print("HSV calibration:")
@@ -417,16 +475,25 @@ if __name__ == "__main__":
     print(f"  White V range: [{white_hsv.get('lower_v')}, {white_hsv.get('upper_v')}]")
     print()
 
-    print("Object detection:")
-    obj_det = config.get_object_detection()
-    print(f"  Obstacle classes: {obj_det.get('obstacle_classes')}")
-    print(f"  Min area: {obj_det.get('obstacle_min_area')}")
+    # Test setting values
+    print("Testing set operations:")
+    print("  Setting navigation.goal_node = 5")
+    config.set("navigation.goal_node", 5)
+    print(f"  New goal node: {config.get('navigation.goal_node')}")
     print()
 
-    print("Red line detection:")
-    red_det = config.get_red_line_detection()
-    print(f"  Window size: {red_det.get('window_size')}")
-    print(f"  Vote threshold: {red_det.get('vote_threshold')}")
+    print("  Setting HSV yellow lower_h = 25")
+    config.set("hsv_calibration.yellow.lower_h", 25)
+    yellow_hsv = config.get_hsv_range("yellow")
+    print(f"  New yellow lower_h: {yellow_hsv.get('lower_h')}")
+    print()
+
+    # Test batch update
+    print("Testing batch update with set_navigation():")
+    config.set_navigation(start_node=1, goal_node=4)
+    nav_config = config.get_navigation()
+    print(f"  Start node: {nav_config.get('start_node')}")
+    print(f"  Goal node: {nav_config.get('goal_node')}")
     print()
 
     print("=" * 80)

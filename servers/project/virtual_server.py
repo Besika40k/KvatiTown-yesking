@@ -25,7 +25,9 @@ from duckiebot.wheel_driver.wheels_driver_abs import WheelPWMConfiguration
 from launcher.ports import find_available_port
 from servers.common import shutdown_cleanup, suppress_http_logs
 from servers.templates.project import get_template as HTML_TEMPLATE
+from servers.visual_lane_servoing.visualization import create_lane_visualization
 from tasks.introduction.packages import manual_drive
+from tasks.visual_lane_servoing.packages.agent import LaneServoingAgent
 
 app = Flask(__name__)
 app.static_folder = os.path.join(project_root, "static")
@@ -163,6 +165,22 @@ def stop_navigation():
         print("[Navigation] Navigation stopped")
 
 
+_DANCE_COLORS = [
+    [1.0, 0.0, 0.0],
+    [0.0, 1.0, 0.0],
+    [0.0, 0.0, 1.0],
+    [1.0, 1.0, 0.0],
+    [0.0, 1.0, 1.0],
+    [1.0, 0.0, 1.0],
+]
+
+
+def _set_leds(colors_by_index: dict):
+    for idx, color in colors_by_index.items():
+        if idx in _virtual_led_states:
+            _virtual_led_states[idx] = color
+
+
 def dance(duration_sec, stop_ev):
     print(f"[Dance] Starting for {duration_sec:.1f}s")
     duration = float(np.clip(duration_sec, 0.5, 10.0))
@@ -177,6 +195,7 @@ def dance(duration_sec, stop_ev):
 
     end_time = time.time() + duration
     step = 0
+    led_indices = [0, 2, 3, 4]
 
     while not stop_ev.is_set() and time.time() < end_time:
         if step % 2 == 0:
@@ -187,17 +206,87 @@ def dance(duration_sec, stop_ev):
         if wheels:
             wheels.set_wheels_speed(left, right)
 
+        new_states = {}
+        for i, led_idx in enumerate(led_indices):
+            color_idx = (step + i) % len(_DANCE_COLORS)
+            new_states[led_idx] = _DANCE_COLORS[color_idx]
+        _set_leds(new_states)
+
         time.sleep(0.1)
         step += 1
 
     if wheels:
         wheels.set_wheels_speed(0.0, 0.0)
+    _set_leds({idx: [0, 0, 0] for idx in led_indices})
     print("[Dance] Done")
+
+
+_vls_agent = LaneServoingAgent()
+
+
+def create_visualization(frame):
+    global current_speeds, keys_pressed, student_code_works
+
+    if frame is None:
+        placeholder = np.zeros((240, 640, 3), dtype=np.uint8)
+        cv2.putText(
+            placeholder,
+            "Waiting for Godot...",
+            (200, 120),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            1,
+            (100, 100, 100),
+            2,
+        )
+        return placeholder
+
+    display = frame.copy()
+    h, w = display.shape[:2]
+    display_w = 640
+    display_h = int(h * display_w / w)
+    display = cv2.resize(display, (display_w, display_h))
+
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    speed_text = f"L: {current_speeds['left']:+.2f}  R: {current_speeds['right']:+.2f}"
+    cv2.putText(display, speed_text, (10, display_h - 10), font, 0.6, (0, 255, 0), 2)
+
+    mode_text = "MANUAL" if _manual_mode else "NAV"
+    color = (0, 255, 0) if _manual_mode else (255, 165, 0)
+    cv2.putText(display, mode_text, (10, 25), font, 0.7, color, 2)
+
+    with keys_lock:
+        kc = keys_pressed.copy()
+
+    key_size = 30
+    gap = 4
+    base_x = display_w - 3 * (key_size + gap) - 10
+    base_y = display_h - 2 * (key_size + gap) - 10
+
+    key_positions = {
+        "up": (base_x + key_size + gap, base_y),
+        "left": (base_x, base_y + key_size + gap),
+        "down": (base_x + key_size + gap, base_y + key_size + gap),
+        "right": (base_x + 2 * (key_size + gap), base_y + key_size + gap),
+    }
+    key_labels = {"up": "^", "down": "v", "left": "<", "right": ">"}
+
+    for key, (kx, ky) in key_positions.items():
+        color = (0, 200, 0) if kc.get(key, False) else (60, 60, 60)
+        cv2.rectangle(display, (kx, ky), (kx + key_size, ky + key_size), color, -1)
+        cv2.rectangle(
+            display, (kx, ky), (kx + key_size, ky + key_size), (100, 100, 100), 1
+        )
+        cv2.putText(
+            display, key_labels[key], (kx + 8, ky + 22), font, 0.6, (255, 255, 255), 2
+        )
+
+    return display
 
 
 def generate_frames():
     """
     MJPEG generator for /video.
+    - Mod: Always use lane servoing visualization regardless of mode.
     """
     while True:
         try:
@@ -205,7 +294,16 @@ def generate_frames():
             if camera is not None:
                 ok, raw_rgb = camera.read_rgb()
                 if ok and raw_rgb is not None:
-                    display = cv2.cvtColor(raw_rgb, cv2.COLOR_RGB2BGR)
+                    raw_bgr = cv2.cvtColor(raw_rgb, cv2.COLOR_RGB2BGR)
+                    _vls_agent.compute_commands(raw_rgb)
+                    vis = create_lane_visualization(
+                        raw_bgr,
+                        _vls_agent.last_debug_info,
+                        current_speeds["left"],
+                        current_speeds["right"],
+                    )
+                    # We can still add the keyboard overlay
+                    display = create_visualization(vis)
 
             if display is None:
                 placeholder = np.zeros((240, 640, 3), dtype=np.uint8)
@@ -247,11 +345,35 @@ def index():
 
 @app.route("/get_hsv")
 def get_hsv():
-    return jsonify(_get_student_module().get_hsv_bounds())
+    from config.config_provider import config
+
+    # Get HSV from config instead of student module
+    yellow = config.get_hsv_range("yellow")
+    white = config.get_hsv_range("white")
+
+    # Return in the format the UI expects
+    return jsonify(
+        {
+            "yellow_lower_h": yellow["lower_h"],
+            "yellow_upper_h": yellow["upper_h"],
+            "yellow_lower_s": yellow["lower_s"],
+            "yellow_upper_s": yellow["upper_s"],
+            "yellow_lower_v": yellow["lower_v"],
+            "yellow_upper_v": yellow["upper_v"],
+            "white_lower_h": white["lower_h"],
+            "white_upper_h": white["upper_h"],
+            "white_lower_s": white["lower_s"],
+            "white_upper_s": white["upper_s"],
+            "white_lower_v": white["lower_v"],
+            "white_upper_v": white["upper_v"],
+        }
+    )
 
 
 @app.route("/update_hsv", methods=["POST"])
 def update_hsv():
+    from config.config_provider import config
+
     data = request.json
     mod = _get_student_module()
     current = mod.get_hsv_bounds()
@@ -275,6 +397,32 @@ def update_hsv():
             yaml.dump(current, f, default_flow_style=False)
     except Exception as e:
         print(f"[Project] Could not save HSV config: {e}")
+
+    # Save to config file
+    config.update_hsv_range(
+        "yellow",
+        {
+            "lower_h": current["yellow_lower_h"],
+            "upper_h": current["yellow_upper_h"],
+            "lower_s": current["yellow_lower_s"],
+            "upper_s": current["yellow_upper_s"],
+            "lower_v": current["yellow_lower_v"],
+            "upper_v": current["yellow_upper_v"],
+        },
+    )
+    config.update_hsv_range(
+        "white",
+        {
+            "lower_h": current["white_lower_h"],
+            "upper_h": current["white_upper_h"],
+            "lower_s": current["white_lower_s"],
+            "upper_s": current["white_upper_s"],
+            "lower_v": current["white_lower_v"],
+            "upper_v": current["white_upper_v"],
+        },
+    )
+    config.save()
+
     return jsonify({"status": "ok"})
 
 
@@ -328,13 +476,64 @@ def set_mode():
     return jsonify({"status": "ok", "manual": _manual_mode})
 
 
+@app.route("/wheels", methods=["POST"])
+def set_wheels():
+    data = request.json
+    left = max(-1.0, min(1.0, float(data.get("left", 0.0))))
+    right = max(-1.0, min(1.0, float(data.get("right", 0.0))))
+    if wheels:
+        wheels.set_wheels_speed(left, right)
+    return jsonify({"status": "ok", "left": left, "right": right})
 
 
+@app.route("/snapshot")
+def snapshot():
+    if camera is None:
+        return jsonify({"status": "error", "message": "Camera not ready"}), 503
+
+    success, frame = camera.read_rgb()
+    if not success or frame is None:
+        return jsonify({"status": "error", "message": "No frame available"}), 503
+
+    frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+    ret, jpeg = cv2.imencode(".jpg", frame_bgr, [cv2.IMWRITE_JPEG_QUALITY, 85])
+    if not ret:
+        return jsonify({"status": "error", "message": "Encode failed"}), 500
+
+    return Response(jpeg.tobytes(), mimetype="image/jpeg")
 
 
+_virtual_led_states = {0: [0, 0, 0], 2: [0, 0, 0], 3: [0, 0, 0], 4: [0, 0, 0]}
 
 
+@app.route("/leds", methods=["POST"])
+def set_led():
+    data = request.json
+    led_index = int(data.get("led", 0))
+    color = [max(0.0, min(1.0, float(c))) for c in data.get("color", [0, 0, 0])]
+    if led_index in _virtual_led_states:
+        _virtual_led_states[led_index] = color
+    return jsonify({"status": "ok", "led": led_index, "color": color})
 
+
+@app.route("/leds/all", methods=["POST"])
+def set_all_leds():
+    color = [max(0.0, min(1.0, float(c))) for c in request.json.get("color", [0, 0, 0])]
+    for idx in (0, 2, 3, 4):
+        _virtual_led_states[idx] = color[:]
+    return jsonify({"status": "ok", "color": color})
+
+
+@app.route("/leds/off", methods=["POST"])
+def leds_off():
+    for idx in (0, 2, 3, 4):
+        _virtual_led_states[idx] = [0, 0, 0]
+    return jsonify({"status": "ok"})
+
+
+@app.route("/leds/state")
+def get_led_state():
+    return jsonify(_virtual_led_states)
 
 
 @app.route("/maneuver", methods=["POST"])
@@ -364,9 +563,16 @@ def nodes_coords():
 
 @app.route("/set_start", methods=["POST"])
 def set_start():
+    from config.config_provider import config
+
     global current_node, start_direction
     current_node = int(request.json["node"])
     start_direction = request.json.get("direction", "N")
+
+    # Save to config
+    config.set_navigation(start_node=current_node, start_direction=start_direction)
+    config.save()
+
     print(f"[Start] Intersection {current_node} direction={start_direction}")
     return jsonify({"status": "ok", "node": current_node, "direction": start_direction})
 
@@ -378,10 +584,16 @@ def get_start():
 
 @app.route("/set_goal", methods=["POST"])
 def set_goal():
+    from config.config_provider import config
+
     global goal_node
 
     goal_node = int(request.json["node"])
     route = dijkstra(current_node, goal_node, start_direction)
+
+    # Save to config
+    config.set_navigation(goal_node=goal_node)
+    config.save()
 
     print("\n===================")
     print("PATH PLANNER")
@@ -414,6 +626,176 @@ def route():
 @app.route("/get_goal")
 def get_goal():
     return jsonify({"node": goal_node})
+
+
+@app.route("/config/bots")
+def get_bot_list():
+    from config.config_provider import config
+
+    return jsonify(
+        {"bots": config.get_bots(), "current": config.get_current_bot_name()}
+    )
+
+
+@app.route("/config/load", methods=["POST"])
+def load_bot_config():
+    from config.config_provider import config
+
+    bot_name = request.json.get("bot_name")
+    if not bot_name:
+        return jsonify({"status": "error", "message": "bot_name required"}), 400
+
+    try:
+        config.load(bot_name)
+        return jsonify(
+            {
+                "status": "ok",
+                "bot_name": bot_name,
+                "message": f"Loaded configuration: {bot_name}",
+            }
+        )
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route("/config/save", methods=["POST"])
+def save_bot_config():
+    from config.config_provider import config
+
+    bot_name = request.json.get("bot_name")
+    if not bot_name:
+        return jsonify({"status": "error", "message": "bot_name required"}), 400
+
+    try:
+        config.save(bot_name)
+        return jsonify(
+            {
+                "status": "ok",
+                "bot_name": bot_name,
+                "message": f"Saved configuration as: {bot_name}",
+            }
+        )
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route("/config/download")
+def download_bot_config():
+    import json
+    import os
+
+    from config.config_provider import config
+
+    try:
+        config_data = config.get_all()
+        config_json = json.dumps(config_data, indent=2)
+        config_path = config.config_path
+        filename = os.path.basename(config_path)
+
+        return Response(
+            config_json,
+            mimetype="application/json",
+            headers={"Content-Disposition": f"attachment; filename={filename}"},
+        )
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route("/get_lane_config")
+def get_lane_config():
+    from config.config_provider import config
+
+    return jsonify(config.get_lane_control())
+
+
+@app.route("/set_lane_config", methods=["POST"])
+def set_lane_config():
+    import tasks.project.packages.agent as _ag
+    from config.config_provider import config
+
+    data = request.json
+
+    # Update config
+    config.set_lane_control(
+        p_gain=data.get("p_gain"),
+        d_gain=data.get("d_gain"),
+        base_speed=data.get("base_speed"),
+    )
+    config.save()
+
+    # Apply to agent
+    lf = _ag.agent.lane_follower
+    lane_cfg = config.get_lane_control()
+    lf.p_gain = lane_cfg["p_gain"]
+    lf.d_gain = lane_cfg["d_gain"]
+    lf.base_speed = lane_cfg["base_speed"]
+
+    print(f"[LaneConfig] p={lf.p_gain} d={lf.d_gain} speed={lf.base_speed}")
+    return jsonify({"status": "ok", **lane_cfg})
+
+
+@app.route("/get_timing_config")
+def get_timing_config():
+    from config.config_provider import config
+
+    timing = config.get_timing()
+    return jsonify(
+        {
+            "forward_clear_time": timing.get("creep_time", 0.80),
+            "exit_timeout": timing.get("exit_timeout", 4.0),
+            "turn_time_forward": timing.get("forward_through", 1.0),
+            "turn_time_left": timing.get("left_turn", 1.10),
+            "turn_time_right": timing.get("right_turn", 0.80),
+            "turn_time_turnaround": timing.get("turnaround", 3.20),
+        }
+    )
+
+
+@app.route("/set_timing_config", methods=["POST"])
+def set_timing_config():
+    import tasks.project.packages.agent as _ag
+    from config.config_provider import config
+
+    data = request.json
+
+    # Map UI keys to config keys
+    updates = {}
+    if "forward_clear_time" in data:
+        updates["creep_time"] = float(data["forward_clear_time"])
+    if "exit_timeout" in data:
+        updates["exit_timeout"] = float(data["exit_timeout"])
+    if "turn_time_forward" in data:
+        updates["forward_through"] = float(data["turn_time_forward"])
+    if "turn_time_left" in data:
+        updates["left_turn"] = float(data["turn_time_left"])
+    if "turn_time_right" in data:
+        updates["right_turn"] = float(data["turn_time_right"])
+    if "turn_time_turnaround" in data:
+        updates["turnaround"] = float(data["turn_time_turnaround"])
+
+    # Update config
+    config.set_timing(**updates)
+    config.save()
+
+    # Apply to agent module
+    timing = config.get_timing()
+    _ag.FORWARD_CLEAR_TIME = timing["creep_time"]
+    _ag.EXIT_TIMEOUT = timing["exit_timeout"]
+    _ag.TURN_TIME_FORWARD = timing["forward_through"]
+    _ag.TURN_TIME_LEFT = timing["left_turn"]
+    _ag.TURN_TIME_RIGHT = timing["right_turn"]
+    _ag.TURN_TIME_TURNAROUND = timing["turnaround"]
+    _ag.TURN_TIMES["forward"] = _ag.TURN_TIME_FORWARD
+    _ag.TURN_TIMES["left"] = _ag.TURN_TIME_LEFT
+    _ag.TURN_TIMES["right"] = _ag.TURN_TIME_RIGHT
+    _ag.TURN_TIMES["turnaround"] = _ag.TURN_TIME_TURNAROUND
+
+    print(
+        f"[TimingConfig] creep={_ag.FORWARD_CLEAR_TIME:.2f} exit={_ag.EXIT_TIMEOUT:.1f} "
+        f"fwd={_ag.TURN_TIME_FORWARD:.2f} left={_ag.TURN_TIME_LEFT:.2f} right={_ag.TURN_TIME_RIGHT:.2f} "
+        f"turnaround={_ag.TURN_TIME_TURNAROUND:.2f}"
+    )
+    return jsonify({"status": "ok"})
 
 
 def _detection_status():

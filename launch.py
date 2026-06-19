@@ -15,6 +15,7 @@ from pathlib import Path
 import requests
 
 from launcher.ports import find_available_port, wait_for_port_file
+from launcher import config
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +23,6 @@ PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, PROJECT_ROOT)
 
 GODOT_PROJECT = os.path.join(PROJECT_ROOT, 'GodotSimulation', 'ducky-bot')
-from launcher.config import GODOT_SCENES
 
 GODOT_VERSION = "4.6"
 GODOT_CACHE_DIR = os.path.join(Path.home(), '.cache', 'duckietown', 'godot')
@@ -190,7 +190,7 @@ def launch_godot(godot_path=None, debug=False, camera_port=None, wheel_port_hint
         except Exception as e:
             print(f"⚠️  Import failed: {e}, continuing anyway...")
 
-    godot_scene = scene or GODOT_SCENES.get('braitenberg', 'res://scenes/braitenberg.tscn')
+    godot_scene = scene or config.GODOT_SCENES.get('braitenberg', 'res://scenes/braitenberg.tscn')
 
     # On macOS, force OpenGL3 (ANGLE) — Metal throttles rendering for occluded windows
     if platform.system() == 'Darwin':
@@ -244,18 +244,18 @@ def run_in_simulation(args):
         print("   Usage: python launch.py --sim --task <task>")
         return 1
 
-    task_name = args.task
-    print(f"Task: {task_name}\n")
+    config.task_name = args.task
+    print(f"Task: {config.task_name}\n")
 
-    godot_scene = GODOT_SCENES.get(task_name)
+    godot_scene = config.GODOT_SCENES.get(config.task_name)
     if not godot_scene:
-        print(f"❌ ERROR: No Godot scene configured for task '{task_name}'")
-        print(f"   Available tasks: {', '.join(GODOT_SCENES.keys())}")
+        print(f"❌ ERROR: No Godot scene configured for task '{config.task_name}'")
+        print(f"   Available tasks: {', '.join(config.GODOT_SCENES.keys())}")
         return 1
 
-    virtual_server_path = os.path.join(PROJECT_ROOT, 'servers', task_name, 'virtual_server.py')
+    virtual_server_path = os.path.join(PROJECT_ROOT, 'servers', config.task_name, 'virtual_server.py')
     if not os.path.exists(virtual_server_path):
-        print(f"❌ ERROR: No virtual server found at servers/{task_name}/virtual_server.py")
+        print(f"❌ ERROR: No virtual server found at servers/{config.task_name}/virtual_server.py")
         return 1
 
     print("[0/3] Finding available ports...")
@@ -295,11 +295,11 @@ def run_in_simulation(args):
         print("❌ ERROR: Godot exited unexpectedly!")
         return 1
 
-    print(f"\n[2/3] Starting {task_name} virtual server...")
-    server = importlib.import_module(f'servers.{task_name}.virtual_server')
+    print(f"\n[2/3] Starting {config.task_name} virtual server...")
+    server = importlib.import_module(f'servers.{config.task_name}.virtual_server')
 
     old_argv = sys.argv.copy()
-    sys.argv = [f'{task_name}_virtual_server.py',
+    sys.argv = [f'{config.task_name}_virtual_server.py',
                 '--port', str(args.port),
                 '--frame-port', str(camera_port),
                 '--wheel-port', str(wheel_port)]
@@ -351,10 +351,10 @@ def package_task(task_name):
         if os.path.exists(task_server_dir):
             print(f"   Adding server: servers/{task_name}/")
             tar.add(task_server_dir, arcname=f'servers/{task_name}', filter=no_pycache)
-        templates_dir = os.path.join(PROJECT_ROOT, 'servers', 'templates')
-        if os.path.isdir(templates_dir):
-            print(f"   Adding templates: servers/templates/")
-            tar.add(templates_dir, arcname='servers/templates', filter=no_pycache)
+            templates_dir = os.path.join(PROJECT_ROOT, 'servers', 'templates')
+            if os.path.isdir(templates_dir):
+                print(f"   Adding templates: servers/templates/")
+                tar.add(templates_dir, arcname='servers/templates', filter=no_pycache)
 
     buf.seek(0)
     print("Package created!")
@@ -437,28 +437,28 @@ def run_on_bot(args):
         print("Error: --bot or --host required")
         return 1
 
-    task_name = args.task
+    config.task_name = args.task
     bot_target = args.bot or args.host
     deploy_port = args.deploy_port
     task_port = args.port
 
-    print(f"Task: {task_name}\nBot: {bot_target}\n")
+    print(f"Task: {config.task_name}\nBot: {bot_target}\n")
 
     print("[0/3] Stopping any running task...")
     stop_task_on_bot(bot_target, deploy_port)
 
     print("\n[1/3] Building and deploying...")
-    package = package_task(task_name)
+    package = package_task(config.task_name)
     if not package:
         return 1
-    if not transfer_to_bot(bot_target, package, task_name, deploy_port):
+    if not transfer_to_bot(bot_target, package, config.task_name, deploy_port):
         return 1
     print("Deployment complete!")
 
     print("\n[2/3] Starting task...")
-    if start_task_on_bot(bot_target, task_name, task_port, deploy_port, debug=args.debug):
+    if start_task_on_bot(bot_target, config.task_name, task_port, deploy_port, debug=args.debug):
         host = _bot_host(bot_target)
-        print(f"\nTask '{task_name}' is running!")
+        print(f"\nTask '{config.task_name}' is running!")
         print(f"   Web UI: http://{host}:{task_port}")
         return 0
     return 1
