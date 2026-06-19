@@ -351,6 +351,10 @@ def package_task(task_name):
         if os.path.exists(task_server_dir):
             print(f"   Adding server: servers/{task_name}/")
             tar.add(task_server_dir, arcname=f'servers/{task_name}', filter=no_pycache)
+        templates_dir = os.path.join(PROJECT_ROOT, 'servers', 'templates')
+        if os.path.isdir(templates_dir):
+            print(f"   Adding templates: servers/templates/")
+            tar.add(templates_dir, arcname='servers/templates', filter=no_pycache)
 
     buf.seek(0)
     print("Package created!")

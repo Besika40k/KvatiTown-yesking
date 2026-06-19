@@ -63,7 +63,7 @@ CREEP_SPEED = 0.06 if not _IS_REAL else 0.3
 EXIT_SPEED = 0.20 if not _IS_REAL else 0.3
 
 # Speed of each wheel during a left/right rotation at an intersection
-TURN_SPEED = 0.20 if not _IS_REAL else 0.3
+TURN_SPEED  = 0.20  if not _IS_REAL else 0.35
 
 # ── Timings ───────────────────────────────────────────────────────────────────
 
@@ -78,10 +78,10 @@ EXIT_TIMEOUT = 4.0 if not _IS_REAL else 4.0
 TURN_TIME_FORWARD = 2 if not _IS_REAL else 1.4
 
 # Seconds to rotate left at an intersection
-TURN_TIME_LEFT = 0.04 if not _IS_REAL else 0.7
+TURN_TIME_LEFT    = 0.04  if not _IS_REAL else 0.5
 
 # Seconds to rotate right at an intersection
-TURN_TIME_RIGHT = 0.15 if not _IS_REAL else 0.55
+TURN_TIME_RIGHT   = 0.15  if not _IS_REAL else 0.5
 
 # Seconds to rotate for a U-turn (turnaround). Rotates the same direction as a
 # left turn, just held longer so the robot swings ~180 instead of ~90.
@@ -391,12 +391,8 @@ class NavigationAgent:
         self._clear_streak = 0
         self._obstacle_stopped = False
         self._led_mode = None
-        if ObjectDetectionAgent is not None:
-            try:
-                self.detector = ObjectDetectionAgent()
-                threading.Thread(target=self._detection_worker, daemon=True).start()
-            except Exception as e:
-                print(f"[Agent] Object detection init failed: {e}", flush=True)
+        # Detector is lazily initialized on first use (see _ensure_detector)
+        # to avoid starting GPU-heavy TensorRT compilation at import time.
 
         self._current_heading = start_direction
 
@@ -418,6 +414,14 @@ class NavigationAgent:
             self._det_frame = None
             self._detections = []
         self._current_heading = start_direction
+
+    def _ensure_detector(self):
+        if self.detector is None and ObjectDetectionAgent is not None:
+            try:
+                self.detector = ObjectDetectionAgent()
+                threading.Thread(target=self._detection_worker, daemon=True).start()
+            except Exception as e:
+                print(f"[Agent] Object detection init failed: {e}", flush=True)
 
     def _detection_worker(self):
         while True:
@@ -565,11 +569,19 @@ class NavigationAgent:
                 )
                 print(f"[Heading] now '{self._current_heading}'", flush=True)
                 self._advance_node()
+
+                # NEW: check arrival immediately after advancing, before resuming driving
+                if server.current_node == goal_node:
+                    print(f"[Agent] Reached goal node {goal_node} — completing", flush=True)
+                    self._transition("completed")
+                    if frame_bgr is not None:
+                        debug_frame = build_debug_frame(
+                            frame_bgr, None, None, None, self.state, fsm_phase, 0.0
+                        )
+                    return True
+
                 self.current_route = None
                 self._route_initialized = False
-                # Start at negative value so robot drives RED_REARM_FRAMES frames
-                # before red line detection is armed — avoids re-triggering on
-                # the same intersection's other red lines during exit.
                 self._driving_frames = -RED_REARM_FRAMES
                 self._red_window.clear()
                 self.lane_follower._prev_error = 0.0
@@ -584,6 +596,7 @@ class NavigationAgent:
         if self.state == "driving":
             frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
 
+            self._ensure_detector()
             if self.detector is not None:
                 with self._det_lock:
                     self._det_frame = frame_rgb
