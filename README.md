@@ -90,8 +90,7 @@ python launch.py --run --bot <bot_name>
                  --task <TASK NAME>
 
 # By IP address
-python launch.py --run --host 192.168.1.100 
-                 --task <TASK NAME>
+python launch.py --run --host 10.144.1.208 --task project
 ```
 
 This packages the task, transfers it to the robot over HTTP, and starts the server. The terminal prints the web interface URL when ready.

@@ -4,8 +4,6 @@ Detection = Tuple[Tuple[int, int, int, int], float, int]
 
 class_names = {0: 'duckie', 1: 'truck', 2: 'sign'}
 
-# Three-state machine: normal driving, decelerating for a nearby obstacle,
-# or fully stopped because an obstacle is directly ahead.
 LANE_FOLLOWING = 'LANE_FOLLOWING'
 OBSTACLE_PRESENT = 'OBSTACLE_PRESENT'
 DECELERATING = 'DECELERATING'
@@ -17,7 +15,6 @@ _stop_reason = ''
 
 
 def _get_best_detection(detections: List[Detection], img_size: int):
-    # Return the detection whose bottom edge is lowest (closest to the robot).
     best = None
     best_bottom = -1
     for bbox, score, cls_id in detections:
@@ -29,7 +26,6 @@ def _get_best_detection(detections: List[Detection], img_size: int):
 
 
 def _is_in_opposing_lane(bbox, img_size) -> bool:
-    # Objects whose centre is left of the lane centre are on the other side.
     x1, _, x2, _ = bbox
     cx = (x1 + x2) / 2
     lane_center = img_size * 0.35
@@ -41,11 +37,10 @@ def _is_in_opposing_lane(bbox, img_size) -> bool:
 def should_stop(detections: List[Detection], img_size: int) -> Tuple[bool, str]:
     global _state, _decel_frame, _clear_count, _stop_reason
 
-    RELEASE_FRAMES = 5   # Consecutive clear frames before resuming.
-    STOP_Y = 0.70        # Bottom edge below 70 % of frame → immediate stop.
-    WARN_Y = 0.55        # Bottom edge below 55 % → start decelerating.
+    RELEASE_FRAMES = 5
+    STOP_Y = 0.70
+    WARN_Y = 0.55
 
-    # Ignore obstacles in the opposing lane.
     filtered = [d for d in detections if not _is_in_opposing_lane(d[0], img_size)]
 
     if _state == LANE_FOLLOWING:

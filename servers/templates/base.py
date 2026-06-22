@@ -2,15 +2,15 @@ BASE_CSS = '''
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 :root {
-    --bg-dark: #0d1117;
-    --bg-darker: #161b22;
+    --bg-dark: #1a1d23;
+    --bg-darker: #13161a;
     --bg-sidebar: #0d1117;
-    --border-color: #21262d;
+    --border-color: #30363d;
     --text-primary: #e6edf3;
     --text-secondary: #8b949e;
-    --text-muted: #484f58;
-    --accent-blue: #58a6ff;
-    --accent-blue-hover: #79c0ff;
+    --text-muted: #6e7681;
+    --accent-blue: #1f6feb;
+    --accent-blue-hover: #388bfd;
     --accent-green: #3fb950;
     --accent-red: #f85149;
     --accent-purple: #a371f7;
@@ -38,8 +38,8 @@ h1 { font-size: 24px; font-weight: 600; margin-bottom: 6px; }
 .container {
     display: grid;
     grid-template-columns: 1fr 360px;
-    gap: 16px;
-    max-width: 1440px;
+    gap: 12px;
+    max-width: 1600px;
     margin: 0 auto;
     align-items: stretch;
     height: calc(100vh - 90px);
@@ -48,7 +48,7 @@ h1 { font-size: 24px; font-weight: 600; margin-bottom: 6px; }
 .video-section {
     background: var(--bg-darker);
     border: 1px solid var(--border-color);
-    border-radius: 8px;
+    border-radius: 6px;
     padding: 12px;
     display: flex;
     align-items: center;
@@ -70,23 +70,19 @@ h1 { font-size: 24px; font-weight: 600; margin-bottom: 6px; }
 .card {
     background: var(--bg-darker);
     border: 1px solid var(--border-color);
-    border-radius: 8px;
-    padding: 16px;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+    border-radius: 6px;
+    padding: 12px;
 }
 
 .card-header {
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 600;
     margin-bottom: 12px;
-    padding-bottom: 10px;
+    padding-bottom: 8px;
     border-bottom: 1px solid var(--border-color);
     display: flex;
     justify-content: space-between;
     align-items: center;
-    letter-spacing: 0.3px;
-    text-transform: uppercase;
-    color: var(--text-secondary);
 }
 
 /* Stats boxes */
@@ -133,7 +129,7 @@ h1 { font-size: 24px; font-weight: 600; margin-bottom: 6px; }
 
 .slider {
     flex: 1;
-    height: 6px;
+    height: 5px;
     background: var(--bg-sidebar);
     outline: none;
     border-radius: 3px;
@@ -142,21 +138,20 @@ h1 { font-size: 24px; font-weight: 600; margin-bottom: 6px; }
 
 .slider::-webkit-slider-thumb {
     appearance: none;
-    width: 16px;
-    height: 16px;
+    width: 14px;
+    height: 14px;
     background: var(--accent-blue);
     cursor: pointer;
     border-radius: 50%;
     border: 2px solid var(--bg-darker);
-    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
 }
 
 .input-box {
     width: 55px;
-    padding: 6px 8px;
+    padding: 5px 6px;
     background: var(--bg-sidebar);
     border: 1px solid var(--border-color);
-    border-radius: 6px;
+    border-radius: 4px;
     color: var(--text-primary);
     font-size: 12px;
     text-align: center;
@@ -167,21 +162,20 @@ h1 { font-size: 24px; font-weight: 600; margin-bottom: 6px; }
 /* Buttons */
 .button {
     width: 100%;
-    padding: 10px 16px;
+    padding: 8px 12px;
     background: var(--accent-blue);
     color: white;
     border: none;
-    border-radius: 6px;
+    border-radius: 5px;
     font-size: 13px;
     font-weight: 500;
     cursor: pointer;
-    transition: background 0.15s, transform 0.1s;
+    transition: background 0.15s;
     font-family: 'Inter', sans-serif;
     margin-bottom: 6px;
 }
 
 .button:hover { background: var(--accent-blue-hover); }
-.button:active { transform: scale(0.98); }
 .button.success { background: var(--accent-green); }
 .button.success:hover { background: #2ea043; }
 .button.danger { background: var(--accent-red); }

@@ -29,7 +29,65 @@ _CONTENT = '''
                 </div>
             </div>
 
-            <!-- HSV Calibration card -->
+            <div class="card">
+                <div class="card-header">
+                    Status
+                    <span id="statusDot" style="width:8px;height:8px;border-radius:50%;
+                        background:var(--accent-green);display:inline-block;"></span>
+                </div>
+                <div id="statusTable" style="font-size:12px;">
+                    <div style="color:var(--text-muted);text-align:center;padding:12px 0;">
+                        Waiting for data...
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">Object Detection</div>
+                <div id="model-status" class="model-status building">Loading&hellip;</div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">Mode</div>
+                <div style="display:flex;align-items:center;gap:12px;padding:4px 0;">
+                    <span style="font-size:13px;color:var(--text-secondary);">Navigation</span>
+                    <label style="position:relative;display:inline-block;width:48px;height:26px;">
+                        <input type="checkbox" id="driveToggle" onchange="toggleMode(this.checked)"
+                            style="opacity:0;width:0;height:0;">
+                        <span id="toggleSlider" style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;
+                            background:var(--bg-sidebar);border:2px solid var(--border-color);border-radius:26px;
+                            transition:.3s;">
+                            <span style="position:absolute;content:\'\';height:18px;width:18px;left:2px;bottom:2px;
+                                background:var(--text-muted);border-radius:50%;transition:.3s;display:block;"
+                                id="toggleKnob"></span>
+                        </span>
+                    </label>
+                    <span style="font-size:13px;color:var(--text-secondary);">Manual Drive</span>
+                </div>
+                <div id="modeStatus" style="font-size:12px;color:var(--text-muted);margin-top:4px;">Mode: Navigation</div>
+            </div>
+
+            <div class="card" id="driveCard" style="display:none;">
+                <div class="card-header">Drive</div>
+                <div class="key-display">
+                    <div class="key-box key-up"    id="key-up">&#9650;</div>
+                    <div class="key-box key-left"  id="key-left">&#9664;</div>
+                    <div class="key-box key-down"  id="key-down">&#9660;</div>
+                    <div class="key-box key-right" id="key-right">&#9654;</div>
+                </div>
+                <p style="text-align:center;font-size:11px;color:var(--text-muted)">Arrow keys or WASD</p>
+            </div>
+
+
+
+            <div class="card">
+                <div class="card-header">Dance Maneuver</div>
+                <div style="display:flex;flex-direction:column;gap:8px;">
+                    <button class="button" onclick="sendDance()">Dance</button>
+                    <div id="danceStatus" class="status"></div>
+                </div>
+            </div>
+
             <div class="card">
                 <div class="card-header">HSV Color Calibration</div>
 
@@ -126,59 +184,6 @@ _CONTENT = '''
                 <div id="hsv-status" class="status"></div>
             </div>
 
-            <div class="card">
-                <div class="card-header">
-                    Status
-                    <span id="statusDot" style="width:8px;height:8px;border-radius:50%;
-                        background:var(--accent-green);display:inline-block;"></span>
-                </div>
-                <div id="statusTable" style="font-size:12px;">
-                    <div style="color:var(--text-muted);text-align:center;padding:12px 0;">
-                        Waiting for data...
-                    </div>
-                </div>
-            </div>
-
-            <div class="card">
-                <div class="card-header">Mode</div>
-                <div style="display:flex;align-items:center;gap:12px;padding:4px 0;">
-                    <span style="font-size:13px;color:var(--text-secondary);">Navigation</span>
-                    <label style="position:relative;display:inline-block;width:48px;height:26px;">
-                        <input type="checkbox" id="driveToggle" onchange="toggleMode(this.checked)"
-                            style="opacity:0;width:0;height:0;">
-                        <span id="toggleSlider" style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;
-                            background:var(--bg-sidebar);border:2px solid var(--border-color);border-radius:26px;
-                            transition:.3s;">
-                            <span style="position:absolute;content:\'\';height:18px;width:18px;left:2px;bottom:2px;
-                                background:var(--text-muted);border-radius:50%;transition:.3s;display:block;"
-                                id="toggleKnob"></span>
-                        </span>
-                    </label>
-                    <span style="font-size:13px;color:var(--text-secondary);">Manual Drive</span>
-                </div>
-                <div id="modeStatus" style="font-size:12px;color:var(--text-muted);margin-top:4px;">Mode: Navigation</div>
-            </div>
-
-            <div class="card" id="driveCard" style="display:none;">
-                <div class="card-header">Drive</div>
-                <div class="key-display">
-                    <div class="key-box key-up"    id="key-up">&#9650;</div>
-                    <div class="key-box key-left"  id="key-left">&#9664;</div>
-                    <div class="key-box key-down"  id="key-down">&#9660;</div>
-                    <div class="key-box key-right" id="key-right">&#9654;</div>
-                </div>
-                <p style="text-align:center;font-size:11px;color:var(--text-muted)">Arrow keys or WASD</p>
-            </div>
-
-
-
-            <div class="card">
-                <div class="card-header">Dance Maneuver</div>
-                <div style="display:flex;flex-direction:column;gap:8px;">
-                    <button class="button" onclick="sendDance()">Dance</button>
-                    <div id="danceStatus" class="status"></div>
-                </div>
-            </div>
         </div>
     </div>
 '''
@@ -214,27 +219,32 @@ _EXTRA_CSS = '''
     font-size: 20px;
     font-weight: 600;
     color: var(--text-muted);
-    transition: all 0.15s ease;
+    transition: all 0.1s;
     user-select: none;
 }
-.key-box.active { background: rgba(63,185,80,0.2); border-color: var(--accent-green); color: var(--accent-green); box-shadow: 0 0 8px rgba(63,185,80,0.25); }
-.hsv-section-title { font-size: 13px; font-weight: 600; color: var(--text-secondary); margin: 12px 0 8px; text-transform: uppercase; letter-spacing: 0.5px; }
-.hsv-section-title.yellow { color: #f1c40f; }
-.hsv-section-title.white  { color: #ecf0f1; }
+.key-box.active { background: rgba(63,185,80,0.2); border-color: var(--accent-green); color: var(--accent-green); }
 .key-up    { grid-area: up; }
 .key-down  { grid-area: down; }
 .key-left  { grid-area: left; }
 .key-right { grid-area: right; }
+.hsv-section-title { font-size: 13px; font-weight: 600; color: var(--text-secondary); margin: 12px 0 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+.hsv-section-title.yellow { color: #f1c40f; }
+.hsv-section-title.white  { color: #ecf0f1; }
+
+.model-status { padding: 6px 10px; border-radius: 4px; font-size: 12px; }
+.model-status.ok      { background: rgba(63,185,80,0.1);  border: 1px solid rgba(63,185,80,0.3);  color: var(--accent-green); }
+.model-status.err     { background: rgba(248,81,73,0.1);  border: 1px solid rgba(248,81,73,0.3);  color: var(--accent-red); }
+.model-status.building{ background: rgba(210,153,34,0.1); border: 1px solid rgba(210,153,34,0.3); color: #d6a63a; }
+
 /* Styles for Standalone Track Grid Panels */
 .standalone-map-container {
     position: relative;
     display: inline-block;
     width: 100%;
     background: #0f141c;
-    border-radius: 8px;
+    border-radius: 6px;
     overflow: hidden;
     border: 1px solid var(--border-color);
-    box-shadow: inset 0 1px 3px rgba(0,0,0,0.3);
 }
 .map-grid-underlay {
     display: block;
@@ -258,7 +268,7 @@ _EXTRA_CSS = '''
     cursor: pointer;
     padding: 0;
     margin: 0;
-    transition: background 0.15s ease, outline 0.15s ease;
+    transition: background 0.1s ease;
 }
 .standalone-tile:hover {
     background: rgba(255, 159, 67, 0.25);
@@ -333,6 +343,7 @@ function syncSliderInput(sliderId, onChange) {
 
 // ── HSV sliders ───────────────────────────────────────────────────────────────
 
+// Map from slider DOM id → server key name
 const HSV_SLIDER_MAP = {
     'yLowH':  'yellow_lower_h', 'yHighH': 'yellow_upper_h',
     'yLowS':  'yellow_lower_s', 'yHighS': 'yellow_upper_s',
@@ -342,6 +353,7 @@ const HSV_SLIDER_MAP = {
     'wLowV':  'white_lower_v',  'wHighV': 'white_upper_v',
 };
 
+// Wire all HSV sliders
 Object.entries(HSV_SLIDER_MAP).forEach(([sliderId, serverKey]) => {
     syncSliderInput(sliderId, () => {
         const val = parseInt(document.getElementById(sliderId).value);
@@ -353,6 +365,7 @@ Object.entries(HSV_SLIDER_MAP).forEach(([sliderId, serverKey]) => {
     });
 });
 
+// Load current HSV values from server once on page load
 fetch('/get_hsv')
     .then(r => r.json())
     .then(d => {
@@ -429,12 +442,33 @@ setInterval(() => { if (manualMode && Object.values(keyState).some(Boolean)) sen
 
 // ── Status polling ────────────────────────────────────────────────────────────
 
+// Detector fields are shown in the Object Detection chip, not the status table
+const DETECTION_KEYS = ['model_loaded', 'load_error', 'trt_building',
+                        'trt_build_elapsed', 'detection_backend'];
+
+function updateModelStatus(data) {
+    const el = document.getElementById('model-status');
+    if (!el) return;
+    if (data.trt_building) {
+        el.className = 'model-status building';
+        el.textContent = 'Building TensorRT engine… (' + (data.trt_build_elapsed || 0) + 's)';
+    } else if (data.model_loaded) {
+        el.className = 'model-status ok';
+        el.textContent = 'Model loaded' +
+            (data.detection_backend ? ' (' + data.detection_backend + ')' : '');
+    } else {
+        el.className = 'model-status err';
+        el.textContent = data.load_error || 'Model not loaded';
+    }
+}
+
 function refreshStatus() {
     fetch('/status')
         .then(r => r.json())
         .then(data => {
+            updateModelStatus(data);
             const table = document.getElementById('statusTable');
-            const keys = Object.keys(data);
+            const keys = Object.keys(data).filter(k => !DETECTION_KEYS.includes(k));
             if (keys.length === 0) {
                 table.innerHTML = '<div style="color:var(--text-muted);text-align:center;padding:12px 0;">No data</div>';
                 return;
@@ -454,13 +488,6 @@ function refreshStatus() {
 
 refreshStatus();
 setInterval(refreshStatus, 500);
-
-// Sync mode with server on load — keys are enabled immediately when server is in manual mode
-fetch('/status').then(r => r.json()).then(data => {
-    const serverManual = data.mode === 'manual';
-    document.getElementById('driveToggle').checked = serverManual;
-    toggleMode(serverManual);
-}).catch(() => { });
 
 // ── Dance ─────────────────────────────────────────────────────────────────────
 
@@ -576,13 +603,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
 def get_template(title='Project', subtitle='Real Duckiebot'):
-    return render_template(
-        title=title,
-        subtitle=subtitle,
-        content_html=_CONTENT,
-        extra_css=_EXTRA_CSS,
-        extra_js=_EXTRA_JS,
-    )
+  return render_template(
+      title=title,
+      subtitle=subtitle,
+      content_html=_CONTENT,
+      extra_css=_EXTRA_CSS,
+      extra_js=_EXTRA_JS,
+  )
 
 
 PROJECT_TEMPLATE = get_template()
