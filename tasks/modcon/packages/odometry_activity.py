@@ -4,9 +4,9 @@ import numpy as np
 
 def delta_phi(ticks: int, prev_ticks: int, resolution: int) -> Tuple[float, float]:
     delta_ticks = ticks - prev_ticks
-    alpha = 2 * np.pi / resolution                      # radians per encoder tick
-    dphi = delta_ticks * alpha                          # wheel rotation in radians
-    return dphi, ticks
+    alpha = 2 * np.pi / resolution  # radians per tick
+    dphi = delta_ticks * alpha
+    return dphi, ticks  # wheel rotation in radians, updated prev_ticks
 
 
 def pose_estimation(
@@ -18,11 +18,11 @@ def pose_estimation(
     delta_phi_left: float,
     delta_phi_right: float,
 ) -> Tuple[float, float, float]:
-    d_left = R * delta_phi_left                         # left wheel arc length
-    d_right = R * delta_phi_right                       # right wheel arc length
+    d_left = R * delta_phi_left
+    d_right = R * delta_phi_right
 
-    d_A = (d_right + d_left) / 2.0                      # average center displacement
-    delta_theta = (d_right - d_left) / baseline          # heading change
+    d_A = (d_right + d_left) / 2.0
+    delta_theta = (d_right - d_left) / baseline
 
     x = x_prev + d_A * np.cos(theta_prev)
     y = y_prev + d_A * np.sin(theta_prev)

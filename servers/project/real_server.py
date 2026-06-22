@@ -260,10 +260,30 @@ def serve_config(filename):
 
 @app.route("/")
 def index():
-    return HTML_TEMPLATE(
+    base = HTML_TEMPLATE(
         title="Navigation — Project",
         subtitle="Real Duckiebot",
     )
+    # Inject lane control card CSS + JS
+    extra = """<style>
+.lane-slider-group{margin-bottom:10px}
+.lane-slider-row{display:flex;align-items:center;gap:10px}
+.lane-slider-row label{min-width:90px;font-size:13px;color:var(--text-secondary)}
+.lane-slider-row input[type=range]{flex:1}
+.lane-slider-row span{min-width:42px;font-size:13px;font-family:monospace;color:var(--text-primary);text-align:right}
+</style>
+<script>
+function injectLaneCard(){const e=[...document.querySelectorAll('.card')].find(c=>c.querySelector('.card-header')?.textContent?.includes('Dance'));if(!e)return;const d=document.createElement('div');d.className='card';d.innerHTML=`<div class="card-header">Lane Control</div><div class="lane-slider-group"><div class="lane-slider-row"><label>P Gain</label><input type="range" id="lc-p" min="0" max="2" step="0.05" value="0.6" oninput="document.getElementById('lc-p-v').textContent=parseFloat(this.value).toFixed(2);applyLaneConfig()"><span id="lc-p-v">0.60</span></div></div><div class="lane-slider-group"><div class="lane-slider-row"><label>D Gain</label><input type="range" id="lc-d" min="0" max="3" step="0.05" value="0.8" oninput="document.getElementById('lc-d-v').textContent=parseFloat(this.value).toFixed(2);applyLaneConfig()"><span id="lc-d-v">0.80</span></div></div><div class="lane-slider-group"><div class="lane-slider-row"><label>Base Speed</label><input type="range" id="lc-s" min="0.02" max="0.4" step="0.01" value="0.08" oninput="document.getElementById('lc-s-v').textContent=parseFloat(this.value).toFixed(2);applyLaneConfig()"><span id="lc-s-v">0.08</span></div></div><div id="lc-status" class="status"></div>`;e.parentNode.insertBefore(d,e);fetch('/get_lane_config').then(r=>r.json()).then(d=>{document.getElementById('lc-p').value=d.p_gain;document.getElementById('lc-p-v').textContent=d.p_gain.toFixed(2);document.getElementById('lc-d').value=d.d_gain;document.getElementById('lc-d-v').textContent=d.d_gain.toFixed(2);document.getElementById('lc-s').value=d.base_speed;document.getElementById('lc-s-v').textContent=d.base_speed.toFixed(2)}).catch(()=>{})}
+function applyLaneConfig(){const p=parseFloat(document.getElementById('lc-p').value),d=parseFloat(document.getElementById('lc-d').value),s=parseFloat(document.getElementById('lc-s').value);postJSON('/set_lane_config',{p_gain:p,d_gain:d,base_speed:s}).then(()=>showStatus('lc-status','Applied!','success')).catch(()=>showStatus('lc-status','Error','error'))}
+document.readyState==='loading'?document.addEventListener('DOMContentLoaded',injectLaneCard):injectLaneCard();
+function injectTimingCard(){const e=[...document.querySelectorAll('.card')].find(c=>c.querySelector('.card-header')?.textContent?.includes('Dance'));if(!e)return;const d=document.createElement('div');d.className='card';d.innerHTML=`<div class="card-header">Intersection Timing</div><div class="lane-slider-group"><div class="lane-slider-row"><label>Creep Time</label><input type="range" id="tc-fct" min="0.1" max="3" step="0.05" value="0.8" oninput="document.getElementById('tc-fct-v').textContent=parseFloat(this.value).toFixed(2);applyTimingConfig()"><span id="tc-fct-v">0.80</span></div></div><div class="lane-slider-group"><div class="lane-slider-row"><label>Exit Timeout</label><input type="range" id="tc-ext" min="0.5" max="8" step="0.5" value="4" oninput="document.getElementById('tc-ext-v').textContent=parseFloat(this.value).toFixed(1);applyTimingConfig()"><span id="tc-ext-v">4.0</span></div></div><div class="lane-slider-group"><div class="lane-slider-row"><label>Post-Turn Floor</label><input type="range" id="tc-pts" min="0.1" max="5" step="0.1" value="1.5" oninput="document.getElementById('tc-pts-v').textContent=parseFloat(this.value).toFixed(2);applyTimingConfig()"><span id="tc-pts-v">1.50</span></div></div><div class="lane-slider-group"><div class="lane-slider-row"><label>Fwd Through</label><input type="range" id="tc-tfwd" min="0.1" max="5" step="0.1" value="1" oninput="document.getElementById('tc-tfwd-v').textContent=parseFloat(this.value).toFixed(1);applyTimingConfig()"><span id="tc-tfwd-v">1.0</span></div></div><div class="lane-slider-group"><div class="lane-slider-row"><label>Left Turn</label><input type="range" id="tc-tl" min="0.1" max="3" step="0.05" value="1.1" oninput="document.getElementById('tc-tl-v').textContent=parseFloat(this.value).toFixed(2);applyTimingConfig()"><span id="tc-tl-v">1.10</span></div></div><div class="lane-slider-group"><div class="lane-slider-row"><label>Right Turn</label><input type="range" id="tc-tr" min="0.1" max="3" step="0.05" value="0.8" oninput="document.getElementById('tc-tr-v').textContent=parseFloat(this.value).toFixed(2);applyTimingConfig()"><span id="tc-tr-v">0.80</span></div></div><div class="lane-slider-group"><div class="lane-slider-row"><label>Turnaround</label><input type="range" id="tc-tta" min="0.1" max="6" step="0.05" value="3.2" oninput="document.getElementById('tc-tta-v').textContent=parseFloat(this.value).toFixed(2);applyTimingConfig()"><span id="tc-tta-v">3.20</span></div></div><div id="tc-status" class="status"></div>`;e.parentNode.insertBefore(d,e);fetch('/get_timing_config').then(r=>r.json()).then(cfg=>{document.getElementById('tc-fct').value=cfg.forward_clear_time;document.getElementById('tc-fct-v').textContent=cfg.forward_clear_time.toFixed(2);document.getElementById('tc-ext').value=cfg.exit_timeout;document.getElementById('tc-ext-v').textContent=cfg.exit_timeout.toFixed(1);document.getElementById('tc-pts').value=cfg.post_turn_straight_time;document.getElementById('tc-pts-v').textContent=cfg.post_turn_straight_time.toFixed(2);document.getElementById('tc-tfwd').value=cfg.turn_time_forward;document.getElementById('tc-tfwd-v').textContent=cfg.turn_time_forward.toFixed(1);document.getElementById('tc-tl').value=cfg.turn_time_left;document.getElementById('tc-tl-v').textContent=cfg.turn_time_left.toFixed(2);document.getElementById('tc-tr').value=cfg.turn_time_right;document.getElementById('tc-tr-v').textContent=cfg.turn_time_right.toFixed(2);document.getElementById('tc-tta').value=cfg.turn_time_turnaround;document.getElementById('tc-tta-v').textContent=cfg.turn_time_turnaround.toFixed(2)}).catch(()=>{})}
+function applyTimingConfig(){postJSON('/set_timing_config',{forward_clear_time:parseFloat(document.getElementById('tc-fct').value),exit_timeout:parseFloat(document.getElementById('tc-ext').value),post_turn_straight_time:parseFloat(document.getElementById('tc-pts').value),turn_time_forward:parseFloat(document.getElementById('tc-tfwd').value),turn_time_left:parseFloat(document.getElementById('tc-tl').value),turn_time_right:parseFloat(document.getElementById('tc-tr').value),turn_time_turnaround:parseFloat(document.getElementById('tc-tta').value)}).then(()=>showStatus('tc-status','Applied!','success')).catch(()=>showStatus('tc-status','Error','error'))}
+document.readyState==='loading'?document.addEventListener('DOMContentLoaded',injectTimingCard):injectTimingCard();
+function injectBiasCard(){const e=[...document.querySelectorAll('.card')].find(c=>c.querySelector('.card-header')?.textContent?.includes('Dance'));if(!e)return;const d=document.createElement('div');d.className='card';d.innerHTML=`<div class="card-header">Turn Bias</div><div class="lane-slider-group"><div class="lane-slider-row"><label>Inner (low)</label><input type="range" id="bc-low" min="-1" max="1" step="0.05" value="0.1" oninput="document.getElementById('bc-low-v').textContent=parseFloat(this.value).toFixed(2);applyBiasConfig()"><span id="bc-low-v">0.10</span></div></div><div class="lane-slider-group"><div class="lane-slider-row"><label>Outer (high)</label><input type="range" id="bc-high" min="0" max="2" step="0.05" value="1.8" oninput="document.getElementById('bc-high-v').textContent=parseFloat(this.value).toFixed(2);applyBiasConfig()"><span id="bc-high-v">1.80</span></div></div><div id="bc-status" class="status"></div>`;e.parentNode.insertBefore(d,e);fetch('/get_turn_bias').then(r=>r.json()).then(cfg=>{document.getElementById('bc-low').value=cfg.turn_bias_low;document.getElementById('bc-low-v').textContent=cfg.turn_bias_low.toFixed(2);document.getElementById('bc-high').value=cfg.turn_bias_high;document.getElementById('bc-high-v').textContent=cfg.turn_bias_high.toFixed(2)}).catch(()=>{})}
+function applyBiasConfig(){postJSON('/set_turn_bias',{turn_bias_low:parseFloat(document.getElementById('bc-low').value),turn_bias_high:parseFloat(document.getElementById('bc-high').value)}).then(()=>showStatus('bc-status','Applied!','success')).catch(()=>showStatus('bc-status','Error','error'))}
+document.readyState==='loading'?document.addEventListener('DOMContentLoaded',injectBiasCard):injectBiasCard();
+</script>"""
+    return base.replace("</body>", extra + "</body>")
 
 
 @app.route("/video")
@@ -379,16 +399,9 @@ def nodes_coords():
 
 @app.route("/set_start", methods=["POST"])
 def set_start():
-    from config.config_provider import config
-
     global current_node, start_direction
     current_node = int(request.json["node"])
     start_direction = request.json.get("direction", "N")
-
-    # Save to config
-    config.set_navigation(start_node=current_node, start_direction=start_direction)
-    config.save()
-
     print(f"[Start] Intersection {current_node} direction={start_direction}")
     return jsonify({"status": "ok", "node": current_node, "direction": start_direction})
 
@@ -400,34 +413,15 @@ def get_start():
 
 @app.route("/get_hsv")
 def get_hsv():
-    from config.config_provider import config
-
-    # Get HSV from config instead of student module
-    yellow = config.get_hsv_range("yellow")
-    white = config.get_hsv_range("white")
-
-    # Return in the format the UI expects
-    return jsonify(
-        {
-            "yellow_lower_h": yellow["lower_h"],
-            "yellow_upper_h": yellow["upper_h"],
-            "yellow_lower_s": yellow["lower_s"],
-            "yellow_upper_s": yellow["upper_s"],
-            "yellow_lower_v": yellow["lower_v"],
-            "yellow_upper_v": yellow["upper_v"],
-            "white_lower_h": white["lower_h"],
-            "white_upper_h": white["upper_h"],
-            "white_lower_s": white["lower_s"],
-            "white_upper_s": white["upper_s"],
-            "white_lower_v": white["lower_v"],
-            "white_upper_v": white["upper_v"],
-        }
+    from tasks.visual_lane_servoing.packages.visual_servoing_activity import (
+        get_hsv_bounds,
     )
+
+    return jsonify(get_hsv_bounds())
 
 
 @app.route("/update_hsv", methods=["POST"])
 def update_hsv():
-    from config.config_provider import config
     from tasks.visual_lane_servoing.packages.visual_servoing_activity import (
         get_hsv_bounds,
         set_hsv_bounds,
@@ -450,46 +444,14 @@ def update_hsv():
         [current["white_lower_h"], current["white_lower_s"], current["white_lower_v"]],
         [current["white_upper_h"], current["white_upper_s"], current["white_upper_v"]],
     )
-
-    # Save to config file
-    config.update_hsv_range(
-        "yellow",
-        {
-            "lower_h": current["yellow_lower_h"],
-            "upper_h": current["yellow_upper_h"],
-            "lower_s": current["yellow_lower_s"],
-            "upper_s": current["yellow_upper_s"],
-            "lower_v": current["yellow_lower_v"],
-            "upper_v": current["yellow_upper_v"],
-        },
-    )
-    config.update_hsv_range(
-        "white",
-        {
-            "lower_h": current["white_lower_h"],
-            "upper_h": current["white_upper_h"],
-            "lower_s": current["white_lower_s"],
-            "upper_s": current["white_upper_s"],
-            "lower_v": current["white_lower_v"],
-            "upper_v": current["white_upper_v"],
-        },
-    )
-    config.save()
-
     return jsonify({"status": "ok", "new_values": get_hsv_bounds()})
 
 
 @app.route("/set_goal", methods=["POST"])
 def set_goal():
-    from config.config_provider import config
-
     global goal_node
     goal_node = int(request.json["node"])
     route = dijkstra(current_node, goal_node, start_direction)
-
-    # Save to config
-    config.set_navigation(goal_node=goal_node)
-    config.save()
 
     print("\n===================")
     print("PATH PLANNER")
@@ -516,79 +478,6 @@ def get_goal():
     return jsonify({"node": goal_node})
 
 
-@app.route("/config/bots")
-def get_bot_list():
-    from config.config_provider import config
-
-    return jsonify(
-        {"bots": config.get_bots(), "current": config.get_current_bot_name()}
-    )
-
-
-@app.route("/config/load", methods=["POST"])
-def load_bot_config():
-    from config.config_provider import config
-
-    bot_name = request.json.get("bot_name")
-    if not bot_name:
-        return jsonify({"status": "error", "message": "bot_name required"}), 400
-
-    try:
-        config.load(bot_name)
-        return jsonify(
-            {
-                "status": "ok",
-                "bot_name": bot_name,
-                "message": f"Loaded configuration: {bot_name}",
-            }
-        )
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-
-@app.route("/config/save", methods=["POST"])
-def save_bot_config():
-    from config.config_provider import config
-
-    bot_name = request.json.get("bot_name")
-    if not bot_name:
-        return jsonify({"status": "error", "message": "bot_name required"}), 400
-
-    try:
-        config.save(bot_name)
-        return jsonify(
-            {
-                "status": "ok",
-                "bot_name": bot_name,
-                "message": f"Saved configuration as: {bot_name}",
-            }
-        )
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-
-@app.route("/config/download")
-def download_bot_config():
-    import json
-    import os
-
-    from config.config_provider import config
-
-    try:
-        config_data = config.get_all()
-        config_json = json.dumps(config_data, indent=2)
-        config_path = config.config_path
-        filename = os.path.basename(config_path)
-
-        return Response(
-            config_json,
-            mimetype="application/json",
-            headers={"Content-Disposition": f"attachment; filename={filename}"},
-        )
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-
 @app.route("/maneuver", methods=["POST"])
 def run_maneuver():
     data = request.json
@@ -605,50 +494,54 @@ def run_maneuver():
 
 @app.route("/get_lane_config")
 def get_lane_config():
-    from config.config_provider import config
+    import tasks.project.packages.agent as _ag
 
-    return jsonify(config.get_lane_control())
+    lf = _ag.agent.lane_follower
+    return jsonify(
+        {
+            "p_gain": lf.p_gain,
+            "d_gain": lf.d_gain,
+            "base_speed": lf.base_speed,
+        }
+    )
 
 
 @app.route("/set_lane_config", methods=["POST"])
 def set_lane_config():
     import tasks.project.packages.agent as _ag
-    from config.config_provider import config
 
     data = request.json
-
-    # Update config
-    config.set_lane_control(
-        p_gain=data.get("p_gain"),
-        d_gain=data.get("d_gain"),
-        base_speed=data.get("base_speed"),
-    )
-    config.save()
-
-    # Apply to agent
     lf = _ag.agent.lane_follower
-    lane_cfg = config.get_lane_control()
-    lf.p_gain = lane_cfg["p_gain"]
-    lf.d_gain = lane_cfg["d_gain"]
-    lf.base_speed = lane_cfg["base_speed"]
-
+    if "p_gain" in data:
+        lf.p_gain = float(data["p_gain"])
+    if "d_gain" in data:
+        lf.d_gain = float(data["d_gain"])
+    if "base_speed" in data:
+        lf.base_speed = float(data["base_speed"])
     print(f"[LaneConfig] p={lf.p_gain} d={lf.d_gain} speed={lf.base_speed}")
-    return jsonify({"status": "ok", **lane_cfg})
+    return jsonify(
+        {
+            "status": "ok",
+            "p_gain": lf.p_gain,
+            "d_gain": lf.d_gain,
+            "base_speed": lf.base_speed,
+        }
+    )
 
 
 @app.route("/get_timing_config")
 def get_timing_config():
-    from config.config_provider import config
+    import tasks.project.packages.agent as _ag
 
-    timing = config.get_timing()
     return jsonify(
         {
-            "forward_clear_time": timing.get("creep_time", 0.80),
-            "exit_timeout": timing.get("exit_timeout", 4.0),
-            "turn_time_forward": timing.get("forward_through", 1.0),
-            "turn_time_left": timing.get("left_turn", 1.10),
-            "turn_time_right": timing.get("right_turn", 0.80),
-            "turn_time_turnaround": timing.get("turnaround", 3.20),
+            "forward_clear_time": _ag.FORWARD_CLEAR_TIME,
+            "exit_timeout": _ag.EXIT_TIMEOUT,
+            "post_turn_straight_time": _ag.POST_TURN_STRAIGHT_TIME,
+            "turn_time_forward": _ag.TURN_TIME_FORWARD,
+            "turn_time_left": _ag.TURN_TIME_LEFT,
+            "turn_time_right": _ag.TURN_TIME_RIGHT,
+            "turn_time_turnaround": _ag.TURN_TIME_TURNAROUND,
         }
     )
 
@@ -656,44 +549,28 @@ def get_timing_config():
 @app.route("/set_timing_config", methods=["POST"])
 def set_timing_config():
     import tasks.project.packages.agent as _ag
-    from config.config_provider import config
 
     data = request.json
-
-    # Map UI keys to config keys
-    updates = {}
     if "forward_clear_time" in data:
-        updates["creep_time"] = float(data["forward_clear_time"])
+        _ag.FORWARD_CLEAR_TIME = float(data["forward_clear_time"])
     if "exit_timeout" in data:
-        updates["exit_timeout"] = float(data["exit_timeout"])
+        _ag.EXIT_TIMEOUT = float(data["exit_timeout"])
+    if "post_turn_straight_time" in data:
+        _ag.POST_TURN_STRAIGHT_TIME = float(data["post_turn_straight_time"])
     if "turn_time_forward" in data:
-        updates["forward_through"] = float(data["turn_time_forward"])
+        _ag.TURN_TIME_FORWARD = float(data["turn_time_forward"])
+        _ag.TURN_TIMES["forward"] = _ag.TURN_TIME_FORWARD
     if "turn_time_left" in data:
-        updates["left_turn"] = float(data["turn_time_left"])
+        _ag.TURN_TIME_LEFT = float(data["turn_time_left"])
+        _ag.TURN_TIMES["left"] = _ag.TURN_TIME_LEFT
     if "turn_time_right" in data:
-        updates["right_turn"] = float(data["turn_time_right"])
+        _ag.TURN_TIME_RIGHT = float(data["turn_time_right"])
+        _ag.TURN_TIMES["right"] = _ag.TURN_TIME_RIGHT
     if "turn_time_turnaround" in data:
-        updates["turnaround"] = float(data["turn_time_turnaround"])
-
-    # Update config
-    config.set_timing(**updates)
-    config.save()
-
-    # Apply to agent module
-    timing = config.get_timing()
-    _ag.FORWARD_CLEAR_TIME = timing["creep_time"]
-    _ag.EXIT_TIMEOUT = timing["exit_timeout"]
-    _ag.TURN_TIME_FORWARD = timing["forward_through"]
-    _ag.TURN_TIME_LEFT = timing["left_turn"]
-    _ag.TURN_TIME_RIGHT = timing["right_turn"]
-    _ag.TURN_TIME_TURNAROUND = timing["turnaround"]
-    _ag.TURN_TIMES["forward"] = _ag.TURN_TIME_FORWARD
-    _ag.TURN_TIMES["left"] = _ag.TURN_TIME_LEFT
-    _ag.TURN_TIMES["right"] = _ag.TURN_TIME_RIGHT
-    _ag.TURN_TIMES["turnaround"] = _ag.TURN_TIME_TURNAROUND
-
+        _ag.TURN_TIME_TURNAROUND = float(data["turn_time_turnaround"])
+        _ag.TURN_TIMES["turnaround"] = _ag.TURN_TIME_TURNAROUND
     print(
-        f"[TimingConfig] creep={_ag.FORWARD_CLEAR_TIME:.2f} exit={_ag.EXIT_TIMEOUT:.1f} "
+        f"[TimingConfig] fwd_clear={_ag.FORWARD_CLEAR_TIME:.2f} exit={_ag.EXIT_TIMEOUT:.1f} "
         f"fwd={_ag.TURN_TIME_FORWARD:.2f} left={_ag.TURN_TIME_LEFT:.2f} right={_ag.TURN_TIME_RIGHT:.2f} "
         f"turnaround={_ag.TURN_TIME_TURNAROUND:.2f}"
     )

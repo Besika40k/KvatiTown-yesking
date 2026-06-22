@@ -26,16 +26,16 @@ def PIDController(
     delta_t: float,
 ) -> Tuple[float, float, float, float]:
     e = theta_ref - theta_hat
-    e = np.arctan2(np.sin(e), np.cos(e))        # wrap error to [-pi, pi]
+    e = np.arctan2(np.sin(e), np.cos(e))
 
-    e_int = prev_int + e * delta_t               # accumulate integral
+    e_int = prev_int + e * delta_t
 
     if delta_t > 0:
-        e_der = (e - prev_e) / delta_t           # finite-difference derivative
+        e_der = (e - prev_e) / delta_t
     else:
         e_der = 0.0
 
-    omega = K_P * e + K_I * e_int + K_D * e_der  # PID output
-    omega = float(np.clip(omega, MIN_OMEGA, MAX_OMEGA))  # clamp to limits
+    omega = K_P * e + K_I * e_int + K_D * e_der
+    omega = float(np.clip(omega, MIN_OMEGA, MAX_OMEGA))
 
     return float(v_0), omega, float(e), float(e_int)

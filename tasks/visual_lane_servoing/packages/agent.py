@@ -61,7 +61,7 @@ class LaneServoingAgent:
         self.min_wheel_speed     = cfg.get('min_wheel_speed',     0.08)
         self.turn_speed_ratio    = cfg.get('turn_speed_ratio',    0.12)
         self.curve_feedforward   = cfg.get('curve_feedforward',   0.12)
-        self.shift_threshold     = cfg.get('shift_threshold',     350)
+        self.curve_threshold     = cfg.get('curve_threshold',     350)
         self.detection_threshold = cfg.get('detection_threshold', 500)
         self.smooth_alpha        = cfg.get('smooth_alpha',        0.6)
         self.steer_smooth        = cfg.get('steer_smooth',        0.6)
@@ -99,12 +99,22 @@ class LaneServoingAgent:
         self._left_turn_state        = 'none'   # 'none' | 'straight' | 'turning'
         self._left_turn_start        = 0.0
         self._left_turn_cooldown_end = 0.0
+        self._left_turn_cooldown_duration = 0.0  # Store actual armed duration for telemetry
         self._left_straight_duration = cfg.get('left_straight_duration', 1.1)
         self._left_turn_max_duration = cfg.get('left_turn_max_duration',  2.5)
         self._left_straight_speed    = cfg.get('left_straight_speed',     0.23)
         self._left_turn_wheel_inner  = cfg.get('left_turn_wheel_inner',   0.07)
         self._left_turn_wheel_outer  = cfg.get('left_turn_wheel_outer',   0.26)
 
+    def set_intersection_cooldown(self, duration: float = 0.4):
+        """Arm a cooldown to prevent false curve-triggers immediately after intersection turns."""
+        now = time.monotonic()  # FIXED: use monotonic to match compute_commands()
+        self._left_turn_cooldown_end = now + duration
+        self._left_turn_cooldown_duration = duration  # Store for telemetry calculations
+        print(
+            f"[LaneFollower.curve] Post-intersection cooldown armed: {duration:.1f}s | now={now:.3f} | cooldown_end={self._left_turn_cooldown_end:.3f}",
+            flush=True,
+        )
 
     def _calculate_error(self, yellow_xs, white_xs, left_det, right_det, w):
         if left_det and right_det and yellow_xs and white_xs:
@@ -274,14 +284,33 @@ class LaneServoingAgent:
         if yellow_slice_count > 0:
             self._yellow_visible_frames = min(self._yellow_visible_frames + 1, 999)
         else:
+            cooldown_active = now < self._left_turn_cooldown_end
+            print(
+                f"[LaneFollower.curve.debug] Yellow-gone check | now={now:.3f} | cooldown_end={self._left_turn_cooldown_end:.3f} | cooldown_active={cooldown_active} | frames={self._yellow_visible_frames}",
+                flush=True,
+            )
             if (
                 self._yellow_visible_frames >= _YELLOW_MIN_FRAMES
                 and self._left_turn_state == "none"
-                and now >= self._left_turn_cooldown_end
+                and not cooldown_active
             ):
                 self._left_turn_state = "straight"
                 self._left_turn_start = now
-                print("[Agent] Yellow gone — left turn: driving straight")
+                print(
+                    f"[LaneFollower.curve] Yellow gone detected (frames={self._yellow_visible_frames}) "
+                    f"— entering left-turn state",
+                    flush=True,
+                )
+            elif (
+                self._yellow_visible_frames >= _YELLOW_MIN_FRAMES
+                and self._left_turn_state == "none"
+                and cooldown_active
+            ):
+                print(
+                    f"[LaneFollower.curve] Yellow gone detected (frames={self._yellow_visible_frames}) "
+                    f"but post-intersection cooldown active — suppressed",
+                    flush=True,
+                )
             self._yellow_visible_frames = 0
 
         # ── Left-turn state machine ───────────────────────────────────────────
@@ -324,7 +353,7 @@ class LaneServoingAgent:
         is_curve, curve_dir = detect_curve(
             yellow_xs,
             white_xs if not white_on_wrong_side else [],
-            self.shift_threshold,
+            self.curve_threshold,
         )
 
         raw_error            = self._calculate_error(yellow_xs, white_xs, left_det, right_det, w)
