@@ -68,7 +68,7 @@ TURN_SPEED = 0.20 if not _IS_REAL else 0.3
 # ── Timings ───────────────────────────────────────────────────────────────────
 
 # How long (seconds) to creep forward over the red line before starting the turn
-FORWARD_CLEAR_TIME = 0.55 if not _IS_REAL else 1.15
+FORWARD_CLEAR_TIME = 1.0 if not _IS_REAL else 1.15
 
 # Maximum seconds to drive forward after a turn while searching for lane lines.
 # If lane is found earlier (EXIT_LANE_PIXEL_THRESH), exits immediately — but only
@@ -77,7 +77,7 @@ EXIT_TIMEOUT = 4.0 if not _IS_REAL else 3.0
 # Minimum seconds to drive straight after a turn before lane-pixel early exit
 # or red-line re-arm. Must clear the ~0.6 m intersection tile and its far-side
 # stop line before the robot can see lane markings / red lines again.
-POST_TURN_STRAIGHT_TIME = 1.5 if not _IS_REAL else 2.0
+POST_TURN_STRAIGHT_TIME = 0.8 if not _IS_REAL else 2.0
 EXIT_LANE_PIXEL_THRESH = 2500
 
 
@@ -156,7 +156,10 @@ def detect_red_line(image):
     mask = np.zeros((h, w), dtype=np.uint8)
     mask[roi_top:, :] = roi_mask
 
-    if int(np.count_nonzero(roi_mask)) < 150:
+    px_count = int(np.count_nonzero(roi_mask))
+    if px_count < 150:
+        if px_count > 0:
+            print(f"[RedLine.debug] REJECTED: px_count={px_count} < 150", flush=True)
         return False, mask
 
     cols = np.where(roi_mask > 0)[1]
@@ -168,9 +171,11 @@ def detect_red_line(image):
     span_y = int(rows.max() - rows.min()) + 1
     aspect = span_x / max(span_y, 1)
 
-    if aspect < 2.5 or span_x < int(w * 0.15):
+    if aspect < 1.5 or span_x < int(w * 0.10):
+        print(f"[RedLine.debug] REJECTED: px={px_count} span_x={span_x} span_y={span_y} aspect={aspect:.2f} (need>=1.5) min_span_x={int(w*0.10)}", flush=True)
         return False, mask
 
+    print(f"[RedLine.debug] DETECTED: px={px_count} span_x={span_x} span_y={span_y} aspect={aspect:.2f}", flush=True)
     return True, mask
 
 
@@ -431,6 +436,7 @@ class IntersectionFSM:
 class NavigationAgent:
     def __init__(self, start_direction="E"):
         self.lane_follower = LaneServoingAgent()
+        self.lane_follower._left_turn_enabled = False
         self.lane_follower._YELLOW_TARGET = 0.30
         self.lane_follower._WHITE_TARGET = 0.72
         self.intersection_fsm = IntersectionFSM()
@@ -743,6 +749,8 @@ class NavigationAgent:
                 self._driving_frames >= RED_ARM_FRAMES
                 and time.monotonic() >= self._straight_clear_until
             )
+            if self._driving_frames % 10 == 0:
+                print(f"[Agent.armed] frames={self._driving_frames} armed={armed} straight_clear_remaining={max(0, self._straight_clear_until - time.monotonic()):.2f}s", flush=True)
 
             if not armed:
                 wheels.set_wheels_speed(left, right + MOTOR_BIAS)

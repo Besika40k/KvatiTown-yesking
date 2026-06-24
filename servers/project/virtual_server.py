@@ -222,6 +222,7 @@ def dance(duration_sec, stop_ev):
 
 
 _vls_agent = LaneServoingAgent()
+_vls_agent._left_turn_enabled = False
 
 
 def create_visualization(frame):

@@ -105,6 +105,7 @@ class LaneServoingAgent:
         self._left_straight_speed    = cfg.get('left_straight_speed',     0.23)
         self._left_turn_wheel_inner  = cfg.get('left_turn_wheel_inner',   0.07)
         self._left_turn_wheel_outer  = cfg.get('left_turn_wheel_outer',   0.26)
+        self._left_turn_enabled      = cfg.get('left_turn_enabled',       True)
 
     def set_intersection_cooldown(self, duration: float = 0.4):
         """Arm a cooldown to prevent false curve-triggers immediately after intersection turns."""
@@ -290,7 +291,8 @@ class LaneServoingAgent:
                 flush=True,
             )
             if (
-                self._yellow_visible_frames >= _YELLOW_MIN_FRAMES
+                self._left_turn_enabled
+                and self._yellow_visible_frames >= _YELLOW_MIN_FRAMES
                 and self._left_turn_state == "none"
                 and not cooldown_active
             ):
