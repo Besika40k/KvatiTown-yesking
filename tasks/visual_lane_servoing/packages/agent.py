@@ -65,6 +65,9 @@ class LaneServoingAgent:
         self.detection_threshold = cfg.get('detection_threshold', 500)
         self.smooth_alpha        = cfg.get('smooth_alpha',        0.6)
         self.steer_smooth        = cfg.get('steer_smooth',        0.6)
+        self.white_guard_x       = float(cfg.get('white_guard_x',       0.62))
+        self.yellow_guard_x      = float(cfg.get('yellow_guard_x',      0.38))
+        self.boundary_guard_steer = float(cfg.get('boundary_guard_steer', 0.16))
         self.apriltag_enabled    = cfg.get('apriltag_enabled',    True)
         self.apriltag_interval   = max(1, int(cfg.get('apriltag_interval', 3)))
         self.apriltag_min_area   = float(cfg.get('apriltag_min_area', 50.0))
@@ -72,6 +75,7 @@ class LaneServoingAgent:
         self.apriltag_stop       = cfg.get('apriltag_stop',       True)
         # Only stop for tags at least this large (pixels^2); 0 = any detected tag.
         self.apriltag_stop_area  = float(cfg.get('apriltag_stop_area', 0.0))
+        self.left_turn_enabled  = cfg.get('left_turn_enabled', True)
 
         self.frame_count        = 0
         self._prev_error        = 0.0
@@ -100,7 +104,8 @@ class LaneServoingAgent:
         self._left_turn_start        = 0.0
         self._left_turn_cooldown_end = 0.0
         self._left_straight_duration = cfg.get('left_straight_duration', 1.1)
-        self._left_turn_max_duration = cfg.get('left_turn_max_duration',  2.5)
+        self._left_turn_max_duration = cfg.get('left_turn_max_duration',  2.8)
+        self._left_turn_min_duration = cfg.get('left_turn_min_duration',  1.15)
         self._left_straight_speed    = cfg.get('left_straight_speed',     0.23)
         self._left_turn_wheel_inner  = cfg.get('left_turn_wheel_inner',   0.07)
         self._left_turn_wheel_outer  = cfg.get('left_turn_wheel_outer',   0.26)
@@ -271,9 +276,9 @@ class LaneServoingAgent:
 
         # ── Yellow-end tracker (intersection detection) ───────────────────────
         _YELLOW_MIN_FRAMES = 8
-        if yellow_slice_count > 0:
+        if self.left_turn_enabled and yellow_slice_count > 0:
             self._yellow_visible_frames = min(self._yellow_visible_frames + 1, 999)
-        else:
+        elif self.left_turn_enabled:
             if (
                 self._yellow_visible_frames >= _YELLOW_MIN_FRAMES
                 and self._left_turn_state == "none"
@@ -285,7 +290,7 @@ class LaneServoingAgent:
             self._yellow_visible_frames = 0
 
         # ── Left-turn state machine ───────────────────────────────────────────
-        if self._left_turn_state == "straight":
+        if self.left_turn_enabled and self._left_turn_state == "straight":
             elapsed = now - self._left_turn_start
             if elapsed < self._left_straight_duration:
                 s = self._left_straight_speed
@@ -294,10 +299,12 @@ class LaneServoingAgent:
             self._left_turn_start = now
             print("[Agent] Left turn: now turning")
 
-        if self._left_turn_state == "turning":
+        if self.left_turn_enabled and self._left_turn_state == "turning":
             elapsed = now - self._left_turn_start
-            # Exit: white line reappears OR hard timeout
-            white_reappeared = white_slice_count >= 2
+            # Exit only after a minimum turn time. At intersections the camera can see
+            # a forward/side white line early, which used to cancel the turn mid-way.
+            min_elapsed = elapsed >= self._left_turn_min_duration
+            white_reappeared = min_elapsed and white_slice_count >= 2
             timed_out        = elapsed >= self._left_turn_max_duration
             if white_reappeared or timed_out:
                 self._left_turn_state        = 'none'
@@ -332,6 +339,13 @@ class LaneServoingAgent:
         steering = self._calculate_steering(self._filtered_error)
         if is_curve:
             steering -= curve_dir * self.curve_feedforward
+        # Boundary guard: steer away when a lane edge gets too close.
+        if not white_on_wrong_side:
+            if white_xs and float(np.mean(white_xs)) < w * self.white_guard_x:
+                steering = max(steering, self.boundary_guard_steer)
+            if yellow_xs and float(np.mean(yellow_xs)) > w * self.yellow_guard_x:
+                steering = min(steering, -self.boundary_guard_steer)
+
         steering = float(np.clip(steering, -self.max_steer, self.max_steer))
         self._filtered_steering = (
             self.steer_smooth * steering

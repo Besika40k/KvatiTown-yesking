@@ -109,6 +109,8 @@ def dance(duration_sec, stop_ev):
 # ── Background overlay thread ────────────────────────────────────────────────
 # Runs detection in a separate thread so generate_frames() never blocks.
 _overlay_frame = [None]
+_overlay_frame_time = [0.0]
+_last_video_frame = [None]
 _overlay_lock = threading.Lock()
 
 
@@ -117,14 +119,17 @@ def _overlay_loop():
 
     while True:
         try:
-            # Navigation: use agent debug frame
-            if agent_mod.debug_frame is not None:
-                with _overlay_lock:
-                    _overlay_frame[0] = agent_mod.debug_frame
+            # Navigation owns the camera while the agent is running; display only
+            # the agent-produced debug frame so the overlay thread does not steal reads.
+            if not _manual_mode:
+                if agent_mod.debug_frame is not None:
+                    with _overlay_lock:
+                        _overlay_frame[0] = agent_mod.debug_frame
+                        _overlay_frame_time[0] = time.time()
                 time.sleep(0.033)
                 continue
 
-            # Manual: read camera and run detection
+            # Manual mode owns the live camera preview.
             if camera is None:
                 time.sleep(0.05)
                 continue
@@ -158,6 +163,7 @@ def _overlay_loop():
 
             with _overlay_lock:
                 _overlay_frame[0] = display
+                _overlay_frame_time[0] = time.time()
 
         except Exception:
             time.sleep(0.05)
@@ -170,10 +176,40 @@ def generate_frames():
     placeholder = None
     while True:
         try:
+            now = time.time()
             with _overlay_lock:
                 display = _overlay_frame[0]
+                overlay_age = now - _overlay_frame_time[0] if _overlay_frame_time[0] else 999.0
 
-            if display is None:
+            # In navigation mode, fall back to the newest raw frame published by
+            # the agent if the debug overlay is missing or stale.
+            if display is None or overlay_age > 0.75:
+                try:
+                    import tasks.project.packages.agent as agent_mod
+                    raw = getattr(agent_mod, "latest_camera_frame", None)
+                    raw_time = float(getattr(agent_mod, "latest_camera_frame_time", 0.0) or 0.0)
+                    if raw is not None and now - raw_time < 1.5:
+                        display = raw
+                except Exception:
+                    pass
+
+            # In manual mode, if overlay processing failed, try one direct read so
+            # the stream stays live instead of waiting for the background thread.
+            if _manual_mode and (display is None or overlay_age > 0.75) and camera is not None:
+                try:
+                    ok, frame = camera.read()
+                    if ok and frame is not None:
+                        if len(frame.shape) == 3 and frame.shape[2] == 4:
+                            frame = frame[:, :, :3]
+                        display = frame
+                except Exception:
+                    pass
+
+            if display is not None:
+                _last_video_frame[0] = display
+            elif _last_video_frame[0] is not None:
+                display = _last_video_frame[0]
+            else:
                 if placeholder is None:
                     placeholder = np.zeros((480, 640, 3), dtype=np.uint8)
                     cv2.putText(
@@ -358,6 +394,14 @@ def set_mode():
     if _manual_mode:
         print("[Mode] Manual Drive - stopping navigation")
         stop_navigation()
+        try:
+            import tasks.project.packages.agent as agent_mod
+            agent_mod.debug_frame = None
+        except Exception:
+            pass
+        with _overlay_lock:
+            _overlay_frame[0] = None
+            _overlay_frame_time[0] = 0.0
         if wheels:
             wheels.set_wheels_speed(0.0, 0.0)
     else:
@@ -682,6 +726,7 @@ def set_timing_config():
     # Apply to agent module
     timing = config.get_timing()
     _ag.FORWARD_CLEAR_TIME = timing["creep_time"]
+    _ag.FORWARD_CLEAR_TIMEOUT = _ag.FORWARD_CLEAR_TIME + (0.5 if not _ag._IS_REAL else 1.6)
     _ag.EXIT_TIMEOUT = timing["exit_timeout"]
     _ag.TURN_TIME_FORWARD = timing["forward_through"]
     _ag.TURN_TIME_LEFT = timing["left_turn"]
