@@ -670,7 +670,7 @@ class NavigationAgent:
                         if edge_data["from"] == server.current_node:
                             enter_dir = edge_data["direction2"]
                         else:
-                            enter_dir = opposite[edge_data["direction1"]]
+                            enter_dir = edge_data["direction1"]
                         self._current_heading = opposite[enter_dir]
                     except (ValueError, IndexError, KeyError):
                         # Fallback for empty routes or missing data

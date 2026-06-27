@@ -101,9 +101,8 @@ def dijkstra(start, goal, start_heading="N", graph=road_map):
                 exit_dir = edge_data["direction1"]
                 enter_dir = edge_data["direction2"]
             else:
-                opposite_dir = {"N": "S", "S": "N", "E": "W", "W": "E"}
-                exit_dir = opposite_dir[edge_data["direction2"]]
-                enter_dir = opposite_dir[edge_data["direction1"]]
+                exit_dir = edge_data["direction2"]
+                enter_dir = edge_data["direction1"]
 
             maneuver = compute_maneuver(current_heading, exit_dir)
             penalty = U_TURN_PENALTY if maneuver == "turnaround" else 0
@@ -144,14 +143,13 @@ def dijkstra(start, goal, start_heading="N", graph=road_map):
         edge_data = graph.get_edge(edge_id)
         if edge_data["from"] == current_node:
             exit_dir = edge_data["direction1"]
-            enter_dir = edge_data["direction2"]
         else:
-            opposite_dir = {"N": "S", "S": "N", "E": "W", "W": "E"}
-            exit_dir = opposite_dir[edge_data["direction2"]]
-            enter_dir = opposite_dir[edge_data["direction1"]]
+            exit_dir = edge_data["direction2"]
             
         maneuver = compute_maneuver(heading, exit_dir)
         directions.append(maneuver)
+        
+        enter_dir = edge_data["direction2"] if edge_data["from"] == current_node else edge_data["direction1"]
         
         opposite = {"N": "S", "S": "N", "E": "W", "W": "E"}
         heading = opposite[enter_dir]
