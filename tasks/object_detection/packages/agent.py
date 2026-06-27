@@ -35,7 +35,7 @@ def _xywh2xyxy(cx, cy, w, h, model_size, img_w, img_h):
 
 class ObjectDetectionAgent:
 
-    def __init__(self, config_path: str = None):
+    def __init__(self, config_path: str = None, max_cpu_threads=None, frame_skip=None):
         path = config_path or _CONFIG_FILE
         try:
             with open(path) as f:
@@ -46,8 +46,11 @@ class ObjectDetectionAgent:
         self.img_size       = cfg.get('img_size',       416)
         self.conf_threshold = cfg.get('conf_threshold', 0.5)
         self.nms_threshold  = cfg.get('nms_threshold',  0.45)
+        self.max_cpu_threads = max_cpu_threads
+        self.frame_skip_override = frame_skip
 
         self.model_path       = self._resolve_model_path(student.MODEL_PATH)
+        self.engine_cache_path = self.model_path + ".trt"
         self.frame_count      = 0
         self.session          = None
         self.net              = None
@@ -99,25 +102,45 @@ class ObjectDetectionAgent:
 
             print("[ObjectDetection] Compiling TensorRT engine (~1 min)...")
             logger  = trt.Logger(trt.Logger.WARNING)
-            builder = trt.Builder(logger)
-            network = builder.create_network(
-                1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)
-            )
-            parser = trt.OnnxParser(network, logger)
-            with open(self.model_path, 'rb') as f:
-                if not parser.parse(f.read()):
-                    for i in range(parser.num_errors):
-                        print(f"[ObjectDetection] TRT parse error: {parser.get_error(i)}")
-                    self.load_error = "TRT ONNX parse failed"
-                    return
+            engine = None
+            if os.path.isfile(self.engine_cache_path):
+                try:
+                    print(f"[ObjectDetection] Loading cached TensorRT engine: {self.engine_cache_path}")
+                    runtime = trt.Runtime(logger)
+                    with open(self.engine_cache_path, "rb") as cache_file:
+                        engine = runtime.deserialize_cuda_engine(cache_file.read())
+                    if engine is None:
+                        print("[ObjectDetection] Cached engine is incompatible; rebuilding")
+                except Exception as cache_error:
+                    print(f"[ObjectDetection] Could not load cached engine: {cache_error}")
+                    engine = None
 
-            config = builder.create_builder_config()
-            config.max_workspace_size = 1 << 28
-            engine = builder.build_engine(network, config)
             if engine is None:
-                self.load_error = "TRT build returned None"
-                print(f"[ObjectDetection] {self.load_error}")
-                return
+                builder = trt.Builder(logger)
+                network = builder.create_network(
+                    1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)
+                )
+                parser = trt.OnnxParser(network, logger)
+                with open(self.model_path, "rb") as model_file:
+                    if not parser.parse(model_file.read()):
+                        for i in range(parser.num_errors):
+                            print(f"[ObjectDetection] TRT parse error: {parser.get_error(i)}")
+                        self.load_error = "TRT ONNX parse failed"
+                        return
+
+                config = builder.create_builder_config()
+                config.max_workspace_size = 1 << 28
+                engine = builder.build_engine(network, config)
+                if engine is None:
+                    self.load_error = "TRT build returned None"
+                    print(f"[ObjectDetection] {self.load_error}")
+                    return
+                try:
+                    with open(self.engine_cache_path, "wb") as cache_file:
+                        cache_file.write(bytes(engine.serialize()))
+                    print(f"[ObjectDetection] Cached TensorRT engine: {self.engine_cache_path}")
+                except Exception as cache_error:
+                    print(f"[ObjectDetection] Could not cache TensorRT engine: {cache_error}")
 
             context = engine.create_execution_context()
             host_in, host_out, dev_ptrs = [], [], []
@@ -164,7 +187,7 @@ class ObjectDetectionAgent:
         try:
             print("[ObjectDetection] Loading ONNX model via onnxruntime...")
             opts = ort.SessionOptions()
-            opts.intra_op_num_threads = os.cpu_count() or 4
+            opts.intra_op_num_threads = self.max_cpu_threads or os.cpu_count() or 4
             opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
             self.session = ort.InferenceSession(
                 self.model_path,
@@ -196,6 +219,8 @@ class ObjectDetectionAgent:
             print(f"[ObjectDetection] {self.load_error}")
 
     def _frame_skip(self) -> int:
+        if self.frame_skip_override is not None:
+            return max(0, int(self.frame_skip_override))
         try:
             return max(0, int(student.NUMBER_FRAMES_SKIPPED()))
         except Exception:

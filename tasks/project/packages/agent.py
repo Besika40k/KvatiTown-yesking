@@ -9,6 +9,8 @@ import numpy as np
 from tasks.project.packages.optimal_path import apply_maneuver, dijkstra
 from tasks.visual_lane_servoing.packages.agent import LaneServoingAgent
 
+OBJECT_DETECTION_IMPORT_ERROR = None
+
 try:
     from tasks.object_detection.packages.agent import (
         CLASS_COLORS,
@@ -16,6 +18,7 @@ try:
         ObjectDetectionAgent,
     )
 except Exception as _e:
+    OBJECT_DETECTION_IMPORT_ERROR = str(_e)
     ObjectDetectionAgent = None
     CLASS_NAMES, CLASS_COLORS = {}, {}
     print(f"[Agent] Object detection unavailable: {_e}", flush=True)
@@ -81,10 +84,16 @@ TURN_TIMES = {
 # Hard timeout: if the lane follower hasn't finished in this many seconds,
 # fall through to the exit phase regardless.
 VISUAL_TURN_TIMEOUT = 4.0 if not _IS_REAL else 7.0
-RIGHT_TURN_MIN_DURATION = 0.20 if not _IS_REAL else 0.95
-RIGHT_TURN_INNER_SPEED = 0.04 if not _IS_REAL else 0.06
-RIGHT_TURN_OUTER_SPEED = 0.22 if not _IS_REAL else 0.30
-RIGHT_TURN_VISUAL_GAIN = 0.08 if not _IS_REAL else 0.10
+# Both turn directions use the normal lane-servo output. A small directional
+# floor keeps the robot committed to the route while the camera sees several
+# competing lane segments inside the intersection.
+VISUAL_TURN_MIN_STEER = 0.10 if not _IS_REAL else 0.14
+VISUAL_TURN_REACQUIRE_FRAMES = 4
+VISUAL_TURN_MIN_DURATION = {
+    "left":       0.35 if not _IS_REAL else 1.10,
+    "right":      0.30 if not _IS_REAL else 1.00,
+    "turnaround": 0.70 if not _IS_REAL else 2.40,
+}
 
 # ── Detection ─────────────────────────────────────────────────────────────────
 RED_WINDOW_SIZE  = 12
@@ -99,6 +108,7 @@ OBSTACLE_ZONE_Y       = 0.45
 OBSTACLE_ZONE_X       = (0.15, 0.85)
 OBSTACLE_STOP_FRAMES  = 2
 OBSTACLE_CLEAR_FRAMES = 8
+OBJECT_DETECTION_INTERVAL = 0.10 if not _IS_REAL else 0.25
 
 
 # ============================================================================
@@ -115,36 +125,39 @@ def detect_red_line(image):
             else np.clip(image, 0, 255).astype(np.uint8)
         )
 
-    h, w     = image.shape[:2]
-    roi_top  = int(h * 0.55)
-    roi      = image[roi_top:, :]
-    hsv      = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
-    roi_mask = cv2.bitwise_or(
-        cv2.inRange(hsv, np.array([0,   100, 100]), np.array([10,  255, 255])),
-        cv2.inRange(hsv, np.array([165, 100, 100]), np.array([180, 255, 255])),
+    h, w = image.shape[:2]
+    roi_top = int(h * 0.50)
+    roi = image[roi_top:, :]
+    hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
+
+    # Narrow hue bands prevent orange/yellow paint becoming red in warm light.
+    raw = cv2.bitwise_or(
+        cv2.inRange(hsv, np.array([0, 80, 60]), np.array([7, 255, 255])),
+        cv2.inRange(hsv, np.array([172, 80, 60]), np.array([180, 255, 255])),
     )
-    kernel   = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
-    roi_mask = cv2.morphologyEx(roi_mask, cv2.MORPH_OPEN, kernel)
+    raw = cv2.morphologyEx(
+        raw, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+    )
+    raw = cv2.morphologyEx(
+        raw, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_RECT, (13, 5))
+    )
+
+    filtered = np.zeros_like(raw)
+    detected = False
+    min_width = max(30, int(w * 0.10))
+    min_area = max(60, int(h * w * 0.00015))
+    contours, _ = cv2.findContours(raw, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    for contour in contours:
+        _x, _y, cw, ch = cv2.boundingRect(contour)
+        area = cv2.contourArea(contour)
+        if area < min_area or cw < min_width or cw / max(ch, 1) < 1.5:
+            continue
+        cv2.drawContours(filtered, [contour], -1, 255, -1)
+        detected = True
 
     mask = np.zeros((h, w), dtype=np.uint8)
-    mask[roi_top:, :] = roi_mask
-
-    if int(np.count_nonzero(roi_mask)) < 150:
-        return False, mask
-
-    cols   = np.where(roi_mask > 0)[1]
-    rows   = np.where(roi_mask > 0)[0]
-    if len(cols) == 0:
-        return False, mask
-
-    span_x = int(cols.max() - cols.min()) + 1
-    span_y = int(rows.max() - rows.min()) + 1
-    aspect = span_x / max(span_y, 1)
-
-    if aspect < 2.5 or span_x < int(w * 0.15):
-        return False, mask
-
-    return True, mask
+    mask[roi_top:, :] = filtered
+    return detected, mask
 
 
 def detect_side_red_turn_cue(image, side="left"):
@@ -162,8 +175,8 @@ def detect_side_red_turn_cue(image, side="left"):
     roi     = image[roi_top:, :]
     hsv     = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
     roi_mask = cv2.bitwise_or(
-        cv2.inRange(hsv, np.array([0,   100, 100]), np.array([10,  255, 255])),
-        cv2.inRange(hsv, np.array([165, 100, 100]), np.array([180, 255, 255])),
+        cv2.inRange(hsv, np.array([0,   80, 60]), np.array([7,   255, 255])),
+        cv2.inRange(hsv, np.array([172, 80, 60]), np.array([180, 255, 255])),
     )
     kernel   = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
     roi_mask = cv2.morphologyEx(roi_mask, cv2.MORPH_OPEN, kernel)
@@ -260,35 +273,14 @@ def get_direction_from_route(current_node, route):
 
 class IntersectionFSM:
     """
-    Phases
-    ------
-    clear  – creep forward until past the stop line (unchanged)
-    turn   – execute the turn using the lane-follower's own state machine
-             (left_turn_enabled=True).  Open-loop is kept as a safety fallback
-             only for right turns and as a hard timeout for all turns.
-    exit   – drive straight until lane markings are confidently re-acquired
-    done   – idle
+    Intersection maneuver controller.
 
-    Visual-servo turn design
-    ------------------------
-    Left / turnaround
-        The LaneServoingAgent already contains a left-turn state machine
-        ('none' → 'straight' → 'turning') triggered by yellow line disappearing.
-        We enable it (left_turn_enabled=True), then call compute_commands() every
-        frame.  The agent drives itself through the bend and signals completion by
-        returning to _left_turn_state == 'none' with its cooldown set.
-        We detect completion by watching that state flag directly.
-
-    Right
-        The agent has no built-in right-turn logic, so we start with the original
-        open-loop spin.  Once white lane pixels reappear (≥ 2 slices), we hand
-        control back to the lane follower immediately — this achieves the same
-        smooth hand-off without needing extra parameters.
-
-    Forward
-        Skips the turn phase entirely (goes straight to exit), same as before.
-
-    In all cases a VISUAL_TURN_TIMEOUT hard limit prevents getting stuck.
+    The clear phase drives beyond the red stop line. Left, right, and turnaround
+    maneuvers then use the normal LaneServoingAgent camera pipeline, constrained
+    by a small route-direction steering floor so competing lines cannot make the
+    bot continue straight. The maneuver completes only after the destination
+    lane is aligned for several consecutive frames. Fixed wheel commands remain
+    only as a fallback when camera processing is unavailable.
     """
 
     def __init__(self):
@@ -298,6 +290,7 @@ class IntersectionFSM:
         self._phase_start  = 0.0
         self._clear_min_end = 0.0
         self._red_lost_at  = None
+        self._lane_reacquire_frames = 0
 
         # Shared reference set by NavigationAgent after construction
         self.lane_follower: LaneServoingAgent = None
@@ -309,6 +302,7 @@ class IntersectionFSM:
         self._phase_start  = 0.0
         self._clear_min_end = 0.0
         self._red_lost_at  = None
+        self._lane_reacquire_frames = 0
 
     @property
     def running(self):
@@ -318,7 +312,7 @@ class IntersectionFSM:
         self._direction = direction
         self._enter_phase("clear")
         print(
-            f"[Intersection] Starting — direction='{direction}' "
+            f"[Intersection] Starting - direction='{direction}' "
             f"clear={FORWARD_CLEAR_TIME:.2f}s timeout={FORWARD_CLEAR_TIMEOUT:.2f}s",
             flush=True,
         )
@@ -338,22 +332,13 @@ class IntersectionFSM:
                 self._enter_phase("exit")
                 return
 
-            # Safety net: if visual servo never finishes, this expires the phase.
             self._phase_end = now + VISUAL_TURN_TIMEOUT
-
-            if self._direction in ("left", "turnaround"):
-                # Arm the lane-follower's left-turn state machine.
-                # It triggers itself when yellow disappears, but we prime the
-                # visible-frames counter so it fires on the very next yellow loss.
-                if self.lane_follower is not None:
-                    self.lane_follower.left_turn_enabled        = True
-                    self.lane_follower._yellow_visible_frames   = 999
-                    self.lane_follower._left_turn_state         = "none"
-                    self.lane_follower._left_turn_cooldown_end  = 0.0
+            self._lane_reacquire_frames = 0
+            if self.lane_follower is not None:
+                self.lane_follower.left_turn_enabled = False
 
         elif phase == "exit":
             self._phase_end = now + EXIT_TIMEOUT
-            # Disable left-turn mode so normal lane following resumes
             if self.lane_follower is not None:
                 self.lane_follower.left_turn_enabled = False
 
@@ -361,11 +346,6 @@ class IntersectionFSM:
             self._phase_end = 0.0
             if self.lane_follower is not None:
                 self.lane_follower.left_turn_enabled = False
-
-    # ------------------------------------------------------------------
-    # Open-loop right/turnaround wheel command (safety fallback only)
-    # ------------------------------------------------------------------
-
     def _open_loop_spin(self, wheels):
         turning_now = True
         if _IS_REAL and self._direction != "forward":
@@ -381,6 +361,46 @@ class IntersectionFSM:
             # turnaround open-loop (should rarely be reached given visual servo)
             wheels.set_wheels_speed(TURN_SPEED * TURN_BIAS_LOW, TURN_SPEED * TURN_BIAS_HIGH)
 
+    def _visual_turn_commands(self, frame_bgr, now):
+        """Return camera-driven wheel commands and whether the new lane is stable."""
+        lf = self.lane_follower
+        frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
+        lane_left, lane_right = lf.compute_commands(frame_rgb)
+
+        debug = lf.last_debug_info or {}
+        yellow_xs = debug.get("yellow_xs", [])
+        white_xs = debug.get("white_xs", [])
+        lane_aligned = False
+        if len(yellow_xs) >= 2 and len(white_xs) >= 2:
+            yellow_mean = float(np.mean(yellow_xs))
+            white_mean = float(np.mean(white_xs))
+            frame_width = frame_bgr.shape[1]
+            lane_center = (yellow_mean + white_mean) * 0.5
+            lane_aligned = (
+                white_mean > yellow_mean + frame_width * 0.05
+                and frame_width * 0.28 <= lane_center <= frame_width * 0.72
+            )
+
+        elapsed = now - self._phase_start
+        min_duration = VISUAL_TURN_MIN_DURATION.get(self._direction, 0.0)
+        if elapsed >= min_duration and lane_aligned:
+            self._lane_reacquire_frames += 1
+            return lane_left, lane_right, (
+                self._lane_reacquire_frames >= VISUAL_TURN_REACQUIRE_FRAMES
+            )
+
+        self._lane_reacquire_frames = 0
+        speed = max(0.12, (float(lane_left) + float(lane_right)) * 0.5)
+        visual_steer = (float(lane_right) - float(lane_left)) * 0.5
+        if self._direction in ("left", "turnaround"):
+            steering = max(visual_steer, VISUAL_TURN_MIN_STEER)
+        else:
+            steering = min(visual_steer, -VISUAL_TURN_MIN_STEER)
+
+        left = speed - steering
+        right = speed + steering
+        left, right = lf._apply_wheel_floor(left, right)
+        return left, right, False
     # ------------------------------------------------------------------
     # Main update — called every control frame while FSM is running
     # ------------------------------------------------------------------
@@ -434,100 +454,34 @@ class IntersectionFSM:
 
         # ── TURN ───────────────────────────────────────────────────────────
         elif self._phase == "turn":
-            lf = self.lane_follower
+            if self.lane_follower is not None and frame_bgr is not None:
+                try:
+                    left, right, turn_done = self._visual_turn_commands(frame_bgr, now)
 
-            # ── Left / turnaround: visual-servo via the agent's state machine ──
-            if self._direction in ("left", "turnaround"):
-                if lf is not None and frame_bgr is not None:
-                    frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
-                    left, right = lf.compute_commands(frame_rgb)
                     wheels.set_wheels_speed(left, right)
-
-                    # The agent's state machine returns to 'none' once it has
-                    # re-acquired the white line (or timed out internally).
-                    # That is our signal to advance to the exit phase.
-                    min_turn_time = getattr(lf, "_left_turn_min_duration", 1.15)
-                    turn_done = (lf._left_turn_state == "none"
-                                 and now - self._phase_start > min_turn_time)
                     if turn_done:
-                        elapsed = now - self._phase_start
                         print(
                             f"[Intersection] Visual {self._direction} turn complete "
-                            f"in {elapsed:.2f}s",
+                            f"after {now - self._phase_start:.2f}s",
                             flush=True,
                         )
                         self._enter_phase("exit")
                     elif finished:
                         print(
-                            f"[Intersection] Visual turn timeout ({VISUAL_TURN_TIMEOUT:.1f}s) "
-                            f"— forcing exit",
+                            f"[Intersection] Visual {self._direction} turn timeout "
+                            f"after {VISUAL_TURN_TIMEOUT:.1f}s - forcing exit",
                             flush=True,
                         )
                         self._enter_phase("exit")
-                else:
-                    # No frame / no follower — open-loop fallback
+                except Exception as exc:
+                    print(f"[Intersection] Visual turn fallback: {exc}", flush=True)
                     self._open_loop_spin(wheels)
                     if finished:
                         self._enter_phase("exit")
-
-            # Right: visual lane-assisted arc until white is re-acquired, then hand off.
             else:
-                elapsed = now - self._phase_start
-                right_min_elapsed = elapsed >= RIGHT_TURN_MIN_DURATION
-                white_reacquired = False
-                visual_commanded = False
-
-                if frame_bgr is not None and lf is not None:
-                    try:
-                        from tasks.visual_lane_servoing.packages.agent import detect_lines_in_slices
-                        from tasks.visual_lane_servoing.packages.visual_servoing_activity import (
-                            detect_lane_markings,
-                        )
-
-                        mask_y, mask_w = detect_lane_markings(frame_bgr)
-                        h_f, w_f = mask_w.shape
-                        yellow_xs, white_xs = detect_lines_in_slices(
-                            (mask_y * 255).astype(np.uint8),
-                            (mask_w * 255).astype(np.uint8),
-                            h_f,
-                        )
-                        white_reacquired = right_min_elapsed and len(white_xs) >= 2
-
-                        # Keep a right arc, but let the observed white line trim the angle.
-                        # If white is too far left/center, keep turning harder right; if it
-                        # is already near the right lane edge, soften the turn.
-                        correction = 0.0
-                        if white_xs:
-                            white_mean = float(np.mean(white_xs))
-                            target_x = w_f * 0.72
-                            correction = float(np.clip((target_x - white_mean) / (w_f / 2.0), -1.0, 1.0))
-                            correction *= RIGHT_TURN_VISUAL_GAIN
-
-                        left_cmd = RIGHT_TURN_OUTER_SPEED + max(0.0, correction)
-                        right_cmd = RIGHT_TURN_INNER_SPEED - min(0.0, correction)
-                        wheels.set_wheels_speed(
-                            float(np.clip(left_cmd, 0.0, 0.45)),
-                            float(np.clip(right_cmd, 0.0, 0.25)),
-                        )
-                        visual_commanded = True
-                    except Exception as exc:
-                        print(f"[Intersection] Right visual turn fallback: {exc}", flush=True)
-
-                if white_reacquired:
-                    print(
-                        f"[Intersection] Visual right turn complete after {elapsed:.2f}s",
-                        flush=True,
-                    )
+                self._open_loop_spin(wheels)
+                if finished:
                     self._enter_phase("exit")
-                elif finished:
-                    print(
-                        f"[Intersection] Right turn timeout - forcing exit", flush=True
-                    )
-                    self._enter_phase("exit")
-                elif not visual_commanded:
-                    self._open_loop_spin(wheels)
-
-        # ── EXIT ───────────────────────────────────────────────────────────
         elif self._phase == "exit":
             wheels.set_wheels_speed(EXIT_SPEED, EXIT_SPEED)
             lane_found = False
@@ -572,6 +526,7 @@ class NavigationAgent:
         self._route_initialized = False
 
         self.detector          = None
+        self.detector_error    = OBJECT_DETECTION_IMPORT_ERROR
         self._det_lock         = threading.Lock()
         self._det_frame        = None
         self._detections       = []
@@ -582,9 +537,17 @@ class NavigationAgent:
 
         if ObjectDetectionAgent is not None:
             try:
-                self.detector = ObjectDetectionAgent()
+                try:
+                    self.detector = ObjectDetectionAgent(max_cpu_threads=2, frame_skip=0)
+                except TypeError as compatibility_error:
+                    print(
+                        f"[Agent] Detector API fallback: {compatibility_error}",
+                        flush=True,
+                    )
+                    self.detector = ObjectDetectionAgent()
                 threading.Thread(target=self._detection_worker, daemon=True).start()
             except Exception as e:
+                self.detector_error = str(e)
                 print(f"[Agent] Object detection init failed: {e}", flush=True)
 
         self._current_heading = start_direction
@@ -611,13 +574,21 @@ class NavigationAgent:
         self._current_heading = start_direction
 
     def _detection_worker(self):
+        next_detection = 0.0
         while True:
+            now = time.monotonic()
+            if now < next_detection:
+                time.sleep(min(0.02, next_detection - now))
+                continue
+
             with self._det_lock:
-                frame           = self._det_frame
+                frame = self._det_frame
                 self._det_frame = None
             if frame is None:
                 time.sleep(0.01)
                 continue
+
+            next_detection = now + OBJECT_DETECTION_INTERVAL
             try:
                 dets = self.detector.detect(frame)
             except Exception as e:
@@ -784,15 +755,21 @@ class NavigationAgent:
             # Build debug frame using live detection every frame, including during crossing
             if frame_bgr is not None:
                 mask_y, mask_w, red_mask_cross = None, None, None
-                try:
-                    from tasks.visual_lane_servoing.packages.visual_servoing_activity import (
-                        detect_lane_markings,
-                    )
-                    _my, _mw = detect_lane_markings(frame_bgr)
-                    mask_y = (_my * 255).astype(np.uint8)
-                    mask_w = (_mw * 255).astype(np.uint8)
-                except Exception as e:
-                    print(f"[Debug] detect_lane_markings error during crossing: {e}", flush=True)
+                if fsm_phase == "turn":
+                    # _visual_turn_commands already processed this frame.
+                    lane_debug = self.lane_follower.last_debug_info or {}
+                    mask_y = lane_debug.get("yellow_mask")
+                    mask_w = lane_debug.get("white_mask")
+                else:
+                    try:
+                        from tasks.visual_lane_servoing.packages.visual_servoing_activity import (
+                            detect_lane_markings,
+                        )
+                        _my, _mw = detect_lane_markings(frame_bgr)
+                        mask_y = (_my * 255).astype(np.uint8)
+                        mask_w = (_mw * 255).astype(np.uint8)
+                    except Exception as e:
+                        print(f"[Debug] detect_lane_markings error during crossing: {e}", flush=True)
 
                 try:
                     _, red_mask_cross = detect_red_line(frame_bgr)
@@ -836,11 +813,11 @@ class NavigationAgent:
 
             self._driving_frames += 1
             armed = self._driving_frames >= RED_ARM_FRAMES
+            red_detected, red_mask = detect_red_line(frame_bgr)
 
             if not armed:
                 wheels.set_wheels_speed(left, right + MOTOR_BIAS)
             else:
-                red_detected, red_mask = detect_red_line(frame_bgr)
                 confirmed = self._red_vote(red_detected)
 
                 vote_fraction = sum(self._red_window) / max(len(self._red_window), 1)
