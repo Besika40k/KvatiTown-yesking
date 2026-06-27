@@ -658,9 +658,29 @@ class NavigationAgent:
                 wheels, frame_bgr, paused=paused
             )
             if not still_running:
-                self._current_heading = apply_maneuver(
-                    self._current_heading, self.intersection_fsm._direction
-                )
+                # Update heading based on the physical curve of the edge we just took
+                if self.current_route and self.current_route.get("edges"):
+                    try:
+                        node_idx = self.current_route["path"].index(server.current_node)
+                        edge_id = self.current_route["edges"][node_idx]
+                        from tasks.project.packages.road_map import road_map
+                        edge_data = road_map.get_edge(edge_id)
+                        
+                        opposite = {"N": "S", "S": "N", "E": "W", "W": "E"}
+                        if edge_data["from"] == server.current_node:
+                            enter_dir = edge_data["direction2"]
+                        else:
+                            enter_dir = edge_data["direction1"]
+                        self._current_heading = opposite[enter_dir]
+                    except (ValueError, IndexError, KeyError):
+                        # Fallback for empty routes or missing data
+                        self._current_heading = apply_maneuver(
+                            self._current_heading, self.intersection_fsm._direction
+                        )
+                else:
+                    self._current_heading = apply_maneuver(
+                        self._current_heading, self.intersection_fsm._direction
+                    )
                 print(f"[Heading] now '{self._current_heading}'", flush=True)
                 print(
                     f"[Agent] Intersection FSM complete | before advance: node={server.current_node} | route.path={self.current_route.get('path') if self.current_route else None}",
