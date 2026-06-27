@@ -109,7 +109,7 @@ TURN_TIMES = {
 # ── Detection ─────────────────────────────────────────────────────────────────
 RED_WINDOW_SIZE = 5
 RED_VOTE_THRESH = 0.60
-RED_ARM_FRAMES = 18  # frames to drive before red line detection is armed
+RED_ARM_FRAMES = 8  # frames to drive before red line detection is armed
 
 # ── Object detection ──────────────────────────────────────────────────────────
 # Classes that make the robot stop: 0 = duckie, 1 = truck (other robots).
