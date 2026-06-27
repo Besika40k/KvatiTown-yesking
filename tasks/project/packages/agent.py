@@ -54,10 +54,12 @@ MOTOR_BIAS = 0 if _IS_REAL else 0.0
 # reproducing the known-good (-TURN_SPEED, +TURN_SPEED) pivot turn. (Both were 0,
 # which made every turn 0 speed — the robot stopped instead of turning.)
 # Sim uses a forward arc (both wheels forward, different speeds).
-TURN_BIAS_LOW = 0.1 if _IS_REAL else 0.1
-TURN_BIAS_HIGH = 1.8 if _IS_REAL else 2
+LEFT_TURN_BIAS_LOW = 0.1 if _IS_REAL else 0.1
+LEFT_TURN_BIAS_HIGH = 1.8 if _IS_REAL else 2
+RIGHT_TURN_BIAS_LOW = 0.1 if _IS_REAL else 0.4
+RIGHT_TURN_BIAS_HIGH = 1.8 if _IS_REAL else 1.4
 # Speed while slowly driving over the red stop line before turning
-CREEP_SPEED = 0.06 if not _IS_REAL else 0.3
+CREEP_SPEED = 0.25 if not _IS_REAL else 0.3
 
 # Speed when driving forward after a turn, searching for lane markings
 EXIT_SPEED = 0.20 if not _IS_REAL else 0.3
@@ -66,6 +68,9 @@ EXIT_SPEED = 0.20 if not _IS_REAL else 0.3
 TURN_SPEED = 0.20 if not _IS_REAL else 0.3
 
 # ── Timings ───────────────────────────────────────────────────────────────────
+
+# How long (seconds) to stop at the red line before proceeding
+STOP_TIME = 1.5 if not _IS_REAL else 1.5
 
 # How long (seconds) to creep forward over the red line before starting the turn
 FORWARD_CLEAR_TIME = 1.4 if not _IS_REAL else 1.15
@@ -102,8 +107,8 @@ TURN_TIMES = {
 }
 
 # ── Detection ─────────────────────────────────────────────────────────────────
-RED_WINDOW_SIZE = 12
-RED_VOTE_THRESH = 0.65
+RED_WINDOW_SIZE = 5
+RED_VOTE_THRESH = 0.60
 RED_ARM_FRAMES = 18  # frames to drive before red line detection is armed
 
 # ── Object detection ──────────────────────────────────────────────────────────
@@ -171,8 +176,8 @@ def detect_red_line(image):
     span_y = int(rows.max() - rows.min()) + 1
     aspect = span_x / max(span_y, 1)
 
-    if aspect < 1.5 or span_x < int(w * 0.10):
-        print(f"[RedLine.debug] REJECTED: px={px_count} span_x={span_x} span_y={span_y} aspect={aspect:.2f} (need>=1.5) min_span_x={int(w*0.10)}", flush=True)
+    if aspect < 1.2 or span_x < int(w * 0.05):
+        print(f"[RedLine.debug] REJECTED: px={px_count} span_x={span_x} span_y={span_y} aspect={aspect:.2f} (need>=1.2) min_span_x={int(w*0.05)}", flush=True)
         return False, mask
 
     print(f"[RedLine.debug] DETECTED: px={px_count} span_x={span_x} span_y={span_y} aspect={aspect:.2f}", flush=True)
@@ -313,13 +318,15 @@ class IntersectionFSM:
     def start(self, direction):
         self._direction = direction
         self._last_tick = None
-        self._enter_phase("clear")
+        self._enter_phase("stop")
         print(f"[Intersection] Starting — direction='{direction}'", flush=True)
 
     def _enter_phase(self, phase):
         self._phase = phase
         now = time.monotonic()
-        if phase == "clear":
+        if phase == "stop":
+            self._phase_end = now + STOP_TIME
+        elif phase == "clear":
             self._phase_end = now + FORWARD_CLEAR_TIME
         elif phase == "turn":
             if self._direction == "forward":
@@ -347,7 +354,12 @@ class IntersectionFSM:
             return True
         finished = now >= self._phase_end
 
-        if self._phase == "clear":
+        if self._phase == "stop":
+            wheels.set_wheels_speed(0.0, 0.0)
+            if finished:
+                self._enter_phase("clear")
+
+        elif self._phase == "clear":
             wheels.set_wheels_speed(CREEP_SPEED, CREEP_SPEED)
             if finished:
                 self._enter_phase("turn")
@@ -356,17 +368,17 @@ class IntersectionFSM:
             if self._direction == "forward":
                 left_speed, right_speed = CREEP_SPEED, CREEP_SPEED
             elif self._direction == "left":
-                left_speed, right_speed = TURN_SPEED*TURN_BIAS_LOW, TURN_SPEED*TURN_BIAS_HIGH
+                left_speed, right_speed = TURN_SPEED*LEFT_TURN_BIAS_LOW, TURN_SPEED*LEFT_TURN_BIAS_HIGH
             elif self._direction == "turnaround":
-                left_speed, right_speed = TURN_SPEED*TURN_BIAS_LOW, TURN_SPEED*TURN_BIAS_HIGH
+                left_speed, right_speed = TURN_SPEED*LEFT_TURN_BIAS_LOW, TURN_SPEED*LEFT_TURN_BIAS_HIGH
             else:
-                left_speed, right_speed = TURN_SPEED*TURN_BIAS_HIGH, TURN_SPEED*TURN_BIAS_LOW
+                left_speed, right_speed = TURN_SPEED*RIGHT_TURN_BIAS_HIGH, TURN_SPEED*RIGHT_TURN_BIAS_LOW
             
             wheels.set_wheels_speed(left_speed, right_speed)
             elapsed_turn_time = now - (self._phase_end - TURN_TIMES[self._direction])
             print(
                 f"[Intersection.turn] {self._direction} | elapsed={elapsed_turn_time:.3f}s "
-                f"| wheel_speeds=({left_speed:.3f}, {right_speed:.3f}) | TURN_BIAS_LOW={TURN_BIAS_LOW} TURN_BIAS_HIGH={TURN_BIAS_HIGH}",
+                f"| wheel_speeds=({left_speed:.3f}, {right_speed:.3f}) | L_BIAS_L={LEFT_TURN_BIAS_LOW} R_BIAS_L={RIGHT_TURN_BIAS_LOW}",
                 flush=True,
             )
             if finished:
@@ -443,7 +455,7 @@ class NavigationAgent:
         self.state = "driving"
         self.current_route = None
         self._red_window = deque(maxlen=RED_WINDOW_SIZE)
-        self._driving_frames = 0
+        self._driving_frames = RED_ARM_FRAMES  # start armed — don't go blind on spawn
         self._route_initialized = False
         self._straight_clear_until = 0.0
         self._lane_follower_enabled = True  # Controls whether lane-follower processes frames
@@ -475,7 +487,7 @@ class NavigationAgent:
         self.state = "driving"
         self.current_route = None
         self._red_window = deque(maxlen=RED_WINDOW_SIZE)
-        self._driving_frames = 0
+        self._driving_frames = RED_ARM_FRAMES  # start armed — don't go blind on spawn
         self._route_initialized = False
         self._straight_clear_until = 0.0
         self._obstacle_streak = 0
