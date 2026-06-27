@@ -68,7 +68,7 @@ TURN_SPEED = 0.20 if not _IS_REAL else 0.3
 # ── Timings ───────────────────────────────────────────────────────────────────
 
 # How long (seconds) to creep forward over the red line before starting the turn
-FORWARD_CLEAR_TIME = 1.0 if not _IS_REAL else 1.15
+FORWARD_CLEAR_TIME = 1.4 if not _IS_REAL else 1.15
 
 # Maximum seconds to drive forward after a turn while searching for lane lines.
 # If lane is found earlier (EXIT_LANE_PIXEL_THRESH), exits immediately — but only
