@@ -185,13 +185,21 @@ def dance(duration_sec, stop_ev):
     print(f"[Dance] Starting for {duration_sec:.1f}s")
     duration = float(np.clip(duration_sec, 0.5, 10.0))
 
+    # Stop and pause before dancing (matching agent behaviour)
     if wheels:
-        wheels.set_wheels_speed(0.8, -0.8)
-        time.sleep(0.6)
-        wheels.set_wheels_speed(0.8, 0.8)
-        time.sleep(1.0)
         wheels.set_wheels_speed(0.0, 0.0)
-        time.sleep(0.1)
+    time.sleep(2.0)
+
+    # 2x 360-degree turn to the right
+    # Godot physics: any differential >= ~0.25 saturates omega at
+    # max_turn_rate = 8.0 rad/s.  2 full rotations = 4*pi ≈ 12.566 rad.
+    # Duration = 12.566 / 8.0 ≈ 1.57 s.
+    if wheels:
+        wheels.set_wheels_speed(0.6, -0.6)
+    time.sleep(1.57)
+    if wheels:
+        wheels.set_wheels_speed(0.0, 0.0)
+    time.sleep(0.2)
 
     end_time = time.time() + duration
     step = 0
@@ -349,18 +357,79 @@ def index():
 .lane-slider-row label{min-width:90px;font-size:13px;color:var(--text-secondary)}
 .lane-slider-row input[type=range]{flex:1}
 .lane-slider-row span{min-width:42px;font-size:13px;font-family:monospace;color:var(--text-primary);text-align:right}
+
+.obstacle-card button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: flex-start;
+  gap: 8px;
+  padding: 0 16px;
+  width: max-content;
+  height: 36px;
+  color: white;
+  text-shadow: 1px 1px rgb(116, 116, 116);
+  text-transform: uppercase;
+  cursor: pointer;
+  border: solid 2px black;
+  letter-spacing: 1px;
+  font-weight: 600;
+  font-size: 14px;
+  background-color: hsl(49deg 98% 60%);
+  border-radius: 50px;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.5s ease;
+}
+
+.obstacle-card button:active {
+  transform: scale(0.9);
+  transition: all 100ms ease;
+}
+
+.obstacle-card button svg {
+  transition: all 0.5s ease;
+  z-index: 2;
+}
+
+.obstacle-card .play {
+  transition: all 0.5s ease;
+  transition-delay: 300ms;
+}
+
+.obstacle-card button:hover svg {
+  transform: scale(3) translate(50%);
+}
+
+.obstacle-card .now {
+  position: absolute;
+  left: 0;
+  transform: translateX(-100%);
+  transition: all 0.5s ease;
+  z-index: 2;
+}
+
+.obstacle-card button:hover .now {
+  transform: translateX(10px);
+  transition-delay: 300ms;
+}
+
+.obstacle-card button:hover .play {
+  transform: translateX(200%);
+  transition-delay: 300ms;
+}
 </style>
 <script>
-function injectLaneCard(){const e=[...document.querySelectorAll('.card')].find(c=>c.querySelector('.card-header')?.textContent?.includes('Dance'));if(!e)return;const d=document.createElement('div');d.className='card';d.innerHTML=`<div class="card-header">Lane Control</div><div class="lane-slider-group"><div class="lane-slider-row"><label>P Gain</label><input type="range" id="lc-p" min="0" max="2" step="0.05" value="0.6" oninput="document.getElementById('lc-p-v').textContent=parseFloat(this.value).toFixed(2);applyLaneConfig()"><span id="lc-p-v">0.60</span></div></div><div class="lane-slider-group"><div class="lane-slider-row"><label>D Gain</label><input type="range" id="lc-d" min="0" max="3" step="0.05" value="0.8" oninput="document.getElementById('lc-d-v').textContent=parseFloat(this.value).toFixed(2);applyLaneConfig()"><span id="lc-d-v">0.80</span></div></div><div class="lane-slider-group"><div class="lane-slider-row"><label>Base Speed</label><input type="range" id="lc-s" min="0.02" max="0.4" step="0.01" value="0.08" oninput="document.getElementById('lc-s-v').textContent=parseFloat(this.value).toFixed(2);applyLaneConfig()"><span id="lc-s-v">0.08</span></div></div><div id="lc-status" class="status"></div>`;e.parentNode.insertBefore(d,e);fetch('/get_lane_config').then(r=>r.json()).then(d=>{document.getElementById('lc-p').value=d.p_gain;document.getElementById('lc-p-v').textContent=d.p_gain.toFixed(2);document.getElementById('lc-d').value=d.d_gain;document.getElementById('lc-d-v').textContent=d.d_gain.toFixed(2);document.getElementById('lc-s').value=d.base_speed;document.getElementById('lc-s-v').textContent=d.base_speed.toFixed(2)}).catch(()=>{})}
+function injectLaneCard(){const e=[...document.querySelectorAll('.card')].find(c=>c.querySelector('.card-header')?.textContent?.includes('Dance'));if(!e)return;const d=document.createElement('div');d.className='card';d.innerHTML=`<div class="card-header">Lane Control</div><div class="lane-slider-group"><div class="lane-slider-row"><label>P Gain</label><input type="range" class="slider" id="lc-p" min="0" max="2" step="0.05" value="0.6" oninput="document.getElementById('lc-p-v').textContent=parseFloat(this.value).toFixed(2);applyLaneConfig()"><span id="lc-p-v">0.60</span></div></div><div class="lane-slider-group"><div class="lane-slider-row"><label>D Gain</label><input type="range" class="slider" id="lc-d" min="0" max="3" step="0.05" value="0.8" oninput="document.getElementById('lc-d-v').textContent=parseFloat(this.value).toFixed(2);applyLaneConfig()"><span id="lc-d-v">0.80</span></div></div><div class="lane-slider-group"><div class="lane-slider-row"><label>Base Speed</label><input type="range" class="slider" id="lc-s" min="0.02" max="0.4" step="0.01" value="0.08" oninput="document.getElementById('lc-s-v').textContent=parseFloat(this.value).toFixed(2);applyLaneConfig()"><span id="lc-s-v">0.08</span></div></div><div id="lc-status" class="status"></div>`;e.parentNode.insertBefore(d,e);if(window.updateSliderFill) d.querySelectorAll('.slider').forEach(updateSliderFill);fetch('/get_lane_config').then(r=>r.json()).then(d=>{document.getElementById('lc-p').value=d.p_gain;document.getElementById('lc-p-v').textContent=d.p_gain.toFixed(2);if(window.updateSliderFill)updateSliderFill(document.getElementById('lc-p'));document.getElementById('lc-d').value=d.d_gain;document.getElementById('lc-d-v').textContent=d.d_gain.toFixed(2);if(window.updateSliderFill)updateSliderFill(document.getElementById('lc-d'));document.getElementById('lc-s').value=d.base_speed;document.getElementById('lc-s-v').textContent=d.base_speed.toFixed(2);if(window.updateSliderFill)updateSliderFill(document.getElementById('lc-s'));}).catch(()=>{})}
 function applyLaneConfig(){const p=parseFloat(document.getElementById('lc-p').value),d=parseFloat(document.getElementById('lc-d').value),s=parseFloat(document.getElementById('lc-s').value);postJSON('/set_lane_config',{p_gain:p,d_gain:d,base_speed:s}).then(()=>showStatus('lc-status','Applied!','success')).catch(()=>showStatus('lc-status','Error','error'))}
-function injectTimingCard(){const e=[...document.querySelectorAll('.card')].find(c=>c.querySelector('.card-header')?.textContent?.includes('Dance'));if(!e)return;const d=document.createElement('div');d.className='card';d.innerHTML=`<div class="card-header">Intersection Timing</div><div class="lane-slider-group"><div class="lane-slider-row"><label>Creep Time</label><input type="range" id="tc-fct" min="0.1" max="3" step="0.05" value="0.8" oninput="document.getElementById('tc-fct-v').textContent=parseFloat(this.value).toFixed(2);applyTimingConfig()"><span id="tc-fct-v">0.80</span></div></div><div class="lane-slider-group"><div class="lane-slider-row"><label>Exit Timeout</label><input type="range" id="tc-ext" min="0.5" max="8" step="0.5" value="4" oninput="document.getElementById('tc-ext-v').textContent=parseFloat(this.value).toFixed(1);applyTimingConfig()"><span id="tc-ext-v">4.0</span></div></div><div class="lane-slider-group"><div class="lane-slider-row"><label>Post-Turn Floor</label><input type="range" id="tc-pts" min="0.1" max="5" step="0.1" value="1.5" oninput="document.getElementById('tc-pts-v').textContent=parseFloat(this.value).toFixed(2);applyTimingConfig()"><span id="tc-pts-v">1.50</span></div></div><div class="lane-slider-group"><div class="lane-slider-row"><label>Fwd Through</label><input type="range" id="tc-tfwd" min="0.1" max="5" step="0.1" value="1" oninput="document.getElementById('tc-tfwd-v').textContent=parseFloat(this.value).toFixed(1);applyTimingConfig()"><span id="tc-tfwd-v">1.0</span></div></div><div class="lane-slider-group"><div class="lane-slider-row"><label>Left Turn</label><input type="range" id="tc-tl" min="0.1" max="3" step="0.05" value="1.1" oninput="document.getElementById('tc-tl-v').textContent=parseFloat(this.value).toFixed(2);applyTimingConfig()"><span id="tc-tl-v">1.10</span></div></div><div class="lane-slider-group"><div class="lane-slider-row"><label>Right Turn</label><input type="range" id="tc-tr" min="0.1" max="3" step="0.05" value="0.8" oninput="document.getElementById('tc-tr-v').textContent=parseFloat(this.value).toFixed(2);applyTimingConfig()"><span id="tc-tr-v">0.80</span></div></div><div class="lane-slider-group"><div class="lane-slider-row"><label>Turnaround</label><input type="range" id="tc-tta" min="0.1" max="6" step="0.05" value="3.2" oninput="document.getElementById('tc-tta-v').textContent=parseFloat(this.value).toFixed(2);applyTimingConfig()"><span id="tc-tta-v">3.20</span></div></div><div id="tc-status" class="status"></div>`;e.parentNode.insertBefore(d,e);fetch('/get_timing_config').then(r=>r.json()).then(cfg=>{document.getElementById('tc-fct').value=cfg.forward_clear_time;document.getElementById('tc-fct-v').textContent=cfg.forward_clear_time.toFixed(2);document.getElementById('tc-ext').value=cfg.exit_timeout;document.getElementById('tc-ext-v').textContent=cfg.exit_timeout.toFixed(1);document.getElementById('tc-pts').value=cfg.post_turn_straight_time;document.getElementById('tc-pts-v').textContent=cfg.post_turn_straight_time.toFixed(2);document.getElementById('tc-tfwd').value=cfg.turn_time_forward;document.getElementById('tc-tfwd-v').textContent=cfg.turn_time_forward.toFixed(1);document.getElementById('tc-tl').value=cfg.turn_time_left;document.getElementById('tc-tl-v').textContent=cfg.turn_time_left.toFixed(2);document.getElementById('tc-tr').value=cfg.turn_time_right;document.getElementById('tc-tr-v').textContent=cfg.turn_time_right.toFixed(2);document.getElementById('tc-tta').value=cfg.turn_time_turnaround;document.getElementById('tc-tta-v').textContent=cfg.turn_time_turnaround.toFixed(2)}).catch(()=>{})}
+function injectTimingCard(){const e=[...document.querySelectorAll('.card')].find(c=>c.querySelector('.card-header')?.textContent?.includes('Dance'));if(!e)return;const d=document.createElement('div');d.className='card';d.innerHTML=`<div class="card-header">Intersection Timing</div><div class="lane-slider-group"><div class="lane-slider-row"><label>Creep Time</label><input type="range" class="slider" id="tc-fct" min="0.1" max="3" step="0.05" value="0.8" oninput="document.getElementById('tc-fct-v').textContent=parseFloat(this.value).toFixed(2);applyTimingConfig()"><span id="tc-fct-v">0.80</span></div></div><div class="lane-slider-group"><div class="lane-slider-row"><label>Exit Timeout</label><input type="range" class="slider" id="tc-ext" min="0.5" max="8" step="0.5" value="4" oninput="document.getElementById('tc-ext-v').textContent=parseFloat(this.value).toFixed(1);applyTimingConfig()"><span id="tc-ext-v">4.0</span></div></div><div class="lane-slider-group"><div class="lane-slider-row"><label>Post-Turn Floor</label><input type="range" class="slider" id="tc-pts" min="0.1" max="5" step="0.1" value="1.5" oninput="document.getElementById('tc-pts-v').textContent=parseFloat(this.value).toFixed(2);applyTimingConfig()"><span id="tc-pts-v">1.50</span></div></div><div class="lane-slider-group"><div class="lane-slider-row"><label>Fwd Through</label><input type="range" class="slider" id="tc-tfwd" min="0.1" max="5" step="0.1" value="1" oninput="document.getElementById('tc-tfwd-v').textContent=parseFloat(this.value).toFixed(1);applyTimingConfig()"><span id="tc-tfwd-v">1.0</span></div></div><div class="lane-slider-group"><div class="lane-slider-row"><label>Left Turn</label><input type="range" class="slider" id="tc-tl" min="0.1" max="3" step="0.05" value="1.1" oninput="document.getElementById('tc-tl-v').textContent=parseFloat(this.value).toFixed(2);applyTimingConfig()"><span id="tc-tl-v">1.10</span></div></div><div class="lane-slider-group"><div class="lane-slider-row"><label>Right Turn</label><input type="range" class="slider" id="tc-tr" min="0.1" max="3" step="0.05" value="0.8" oninput="document.getElementById('tc-tr-v').textContent=parseFloat(this.value).toFixed(2);applyTimingConfig()"><span id="tc-tr-v">0.80</span></div></div><div class="lane-slider-group"><div class="lane-slider-row"><label>Turnaround</label><input type="range" class="slider" id="tc-tta" min="0.1" max="6" step="0.05" value="3.2" oninput="document.getElementById('tc-tta-v').textContent=parseFloat(this.value).toFixed(2);applyTimingConfig()"><span id="tc-tta-v">3.20</span></div></div><div id="tc-status" class="status"></div>`;e.parentNode.insertBefore(d,e);if(window.updateSliderFill) d.querySelectorAll('.slider').forEach(updateSliderFill);fetch('/get_timing_config').then(r=>r.json()).then(cfg=>{document.getElementById('tc-fct').value=cfg.forward_clear_time;document.getElementById('tc-fct-v').textContent=cfg.forward_clear_time.toFixed(2);if(window.updateSliderFill)updateSliderFill(document.getElementById('tc-fct'));document.getElementById('tc-ext').value=cfg.exit_timeout;document.getElementById('tc-ext-v').textContent=cfg.exit_timeout.toFixed(1);if(window.updateSliderFill)updateSliderFill(document.getElementById('tc-ext'));document.getElementById('tc-pts').value=cfg.post_turn_straight_time;document.getElementById('tc-pts-v').textContent=cfg.post_turn_straight_time.toFixed(2);if(window.updateSliderFill)updateSliderFill(document.getElementById('tc-pts'));document.getElementById('tc-tfwd').value=cfg.turn_time_forward;document.getElementById('tc-tfwd-v').textContent=cfg.turn_time_forward.toFixed(1);if(window.updateSliderFill)updateSliderFill(document.getElementById('tc-tfwd'));document.getElementById('tc-tl').value=cfg.turn_time_left;document.getElementById('tc-tl-v').textContent=cfg.turn_time_left.toFixed(2);if(window.updateSliderFill)updateSliderFill(document.getElementById('tc-tl'));document.getElementById('tc-tr').value=cfg.turn_time_right;document.getElementById('tc-tr-v').textContent=cfg.turn_time_right.toFixed(2);if(window.updateSliderFill)updateSliderFill(document.getElementById('tc-tr'));document.getElementById('tc-tta').value=cfg.turn_time_turnaround;document.getElementById('tc-tta-v').textContent=cfg.turn_time_turnaround.toFixed(2);if(window.updateSliderFill)updateSliderFill(document.getElementById('tc-tta'));}).catch(()=>{})}
 function applyTimingConfig(){postJSON('/set_timing_config',{forward_clear_time:parseFloat(document.getElementById('tc-fct').value),exit_timeout:parseFloat(document.getElementById('tc-ext').value),post_turn_straight_time:parseFloat(document.getElementById('tc-pts').value),turn_time_forward:parseFloat(document.getElementById('tc-tfwd').value),turn_time_left:parseFloat(document.getElementById('tc-tl').value),turn_time_right:parseFloat(document.getElementById('tc-tr').value),turn_time_turnaround:parseFloat(document.getElementById('tc-tta').value)}).then(()=>showStatus('tc-status','Applied!','success')).catch(()=>showStatus('tc-status','Error','error'))}
 document.readyState==='loading'?document.addEventListener('DOMContentLoaded',injectTimingCard):injectTimingCard();
 document.readyState==='loading'?document.addEventListener('DOMContentLoaded',injectLaneCard):injectLaneCard();
-function injectBiasCard(){const e=[...document.querySelectorAll('.card')].find(c=>c.querySelector('.card-header')?.textContent?.includes('Dance'));if(!e)return;const d=document.createElement('div');d.className='card';d.innerHTML=`<div class="card-header">Turn Bias</div><div class="lane-slider-group"><div class="lane-slider-row"><label>Inner (low)</label><input type="range" id="bc-low" min="-1" max="1" step="0.05" value="0.1" oninput="document.getElementById('bc-low-v').textContent=parseFloat(this.value).toFixed(2);applyBiasConfig()"><span id="bc-low-v">0.10</span></div></div><div class="lane-slider-group"><div class="lane-slider-row"><label>Outer (high)</label><input type="range" id="bc-high" min="0" max="2" step="0.05" value="1.8" oninput="document.getElementById('bc-high-v').textContent=parseFloat(this.value).toFixed(2);applyBiasConfig()"><span id="bc-high-v">1.80</span></div></div><div id="bc-status" class="status"></div>`;e.parentNode.insertBefore(d,e);fetch('/get_turn_bias').then(r=>r.json()).then(cfg=>{document.getElementById('bc-low').value=cfg.turn_bias_low;document.getElementById('bc-low-v').textContent=cfg.turn_bias_low.toFixed(2);document.getElementById('bc-high').value=cfg.turn_bias_high;document.getElementById('bc-high-v').textContent=cfg.turn_bias_high.toFixed(2)}).catch(()=>{})}
+function injectBiasCard(){const e=[...document.querySelectorAll('.card')].find(c=>c.querySelector('.card-header')?.textContent?.includes('Dance'));if(!e)return;const d=document.createElement('div');d.className='card';d.innerHTML=`<div class="card-header">Turn Bias</div><div class="lane-slider-group"><div class="lane-slider-row"><label>Inner (low)</label><input type="range" class="slider" id="bc-low" min="-1" max="1" step="0.05" value="0.1" oninput="document.getElementById('bc-low-v').textContent=parseFloat(this.value).toFixed(2);applyBiasConfig()"><span id="bc-low-v">0.10</span></div></div><div class="lane-slider-group"><div class="lane-slider-row"><label>Outer (high)</label><input type="range" class="slider" id="bc-high" min="0" max="2" step="0.05" value="1.8" oninput="document.getElementById('bc-high-v').textContent=parseFloat(this.value).toFixed(2);applyBiasConfig()"><span id="bc-high-v">1.80</span></div></div><div id="bc-status" class="status"></div>`;e.parentNode.insertBefore(d,e);if(window.updateSliderFill) d.querySelectorAll('.slider').forEach(updateSliderFill);fetch('/get_turn_bias').then(r=>r.json()).then(cfg=>{document.getElementById('bc-low').value=cfg.turn_bias_low;document.getElementById('bc-low-v').textContent=cfg.turn_bias_low.toFixed(2);if(window.updateSliderFill)updateSliderFill(document.getElementById('bc-low'));document.getElementById('bc-high').value=cfg.turn_bias_high;document.getElementById('bc-high-v').textContent=cfg.turn_bias_high.toFixed(2);if(window.updateSliderFill)updateSliderFill(document.getElementById('bc-high'));}).catch(()=>{})}
 function applyBiasConfig(){postJSON('/set_turn_bias',{turn_bias_low:parseFloat(document.getElementById('bc-low').value),turn_bias_high:parseFloat(document.getElementById('bc-high').value)}).then(()=>showStatus('bc-status','Applied!','success')).catch(()=>showStatus('bc-status','Error','error'))}
 document.readyState==='loading'?document.addEventListener('DOMContentLoaded',injectBiasCard):injectBiasCard();
-function injectObstacleCard(){const e=[...document.querySelectorAll('.card')].find(c=>c.querySelector('.card-header')?.textContent?.includes('Dance'));if(!e)return;const d=document.createElement('div');d.className='card';d.innerHTML=`<div class="card-header">Obstacle Management</div><div style="display:flex;flex-direction:column;gap:8px;"><button class="button" onclick="removeObjects('duckie')" style="background:#555">Remove Obstacles</button></div>`;e.parentNode.insertBefore(d,e);}
+function injectObstacleCard(){const e=[...document.querySelectorAll('.card')].find(c=>c.querySelector('.card-header')?.textContent?.includes('Dance'));if(!e)return;const d=document.createElement('div');d.className='card obstacle-card';d.innerHTML=`<div class="card-header">Obstacle Management</div><div style="display:flex;flex-direction:column;gap:8px;"><button onclick="removeObjects('duckie')"><svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg><span class="now">now!</span><span class="play">Remove Obstacles</span></button></div>`;e.parentNode.insertBefore(d,e);}
 function removeObjects(filter){postJSON('/remove_objects',{filter:filter}).then(()=>console.log('Obstacles removed')).catch(e=>console.error(e));}
 document.readyState==='loading'?document.addEventListener('DOMContentLoaded',injectObstacleCard):injectObstacleCard();
 </script>"""

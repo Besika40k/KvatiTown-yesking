@@ -18,7 +18,7 @@ _EXTRA_CSS = '''
     background: var(--bg-sidebar);
     transition: background 0.1s, border-color 0.1s, color 0.1s;
 }
-.key-box.active { background: rgba(63,185,80,0.2); border-color: var(--accent-green); color: var(--accent-green); }
+.key-box.active { background: rgba(212,167,44,0.2); border-color: var(--accent-green); color: var(--accent-green); }
 .key-up    { grid-area: up; }
 .key-down  { grid-area: down; }
 .key-left  { grid-area: left; }
@@ -74,7 +74,7 @@ _EXTRA_CSS = '''
 .empty-state { color: var(--text-muted); font-size: 12px; text-align: center; padding: 12px; }
 
 .model-status { padding: 6px 10px; border-radius: 4px; font-size: 12px; margin-bottom: 10px; }
-.model-status.ok      { background: rgba(63,185,80,0.1);  border: 1px solid rgba(63,185,80,0.3);  color: var(--accent-green); }
+.model-status.ok      { background: rgba(212,167,44,0.1);  border: 1px solid rgba(212,167,44,0.3);  color: var(--accent-green); }
 .model-status.err     { background: rgba(248,81,73,0.1);  border: 1px solid rgba(248,81,73,0.3);  color: var(--accent-red); }
 .model-status.building{ background: rgba(210,153,34,0.1); border: 1px solid rgba(210,153,34,0.3); color: #d6a63a; }
 

@@ -47,21 +47,43 @@ _CONTENT = '''
             <div class="card">
                 <div class="card-header">Mode</div>
                 <div style="display:flex;align-items:center;gap:12px;padding:4px 0;">
-                    <span style="font-size:13px;color:var(--text-secondary);">Navigation</span>
-                    <label style="position:relative;display:inline-block;width:48px;height:26px;">
-                        <input type="checkbox" id="driveToggle" onchange="toggleMode(this.checked)"
-                            style="opacity:0;width:0;height:0;">
-                        <span id="toggleSlider" style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;
-                            background:var(--bg-sidebar);border:2px solid var(--border-color);border-radius:26px;
-                            transition:.3s;">
-                            <span style="position:absolute;content:\'\';height:18px;width:18px;left:2px;bottom:2px;
-                                background:var(--text-muted);border-radius:50%;transition:.3s;display:block;"
-                                id="toggleKnob"></span>
-                        </span>
-                    </label>
-                    <span style="font-size:13px;color:var(--text-secondary);">Manual Drive</span>
+                    <span style="font-size:13px;color:var(--accent-blue);font-weight:600;">Navigation</span>
+                    <label class="bb8-toggle">
+                        <input class="bb8-toggle__checkbox" type="checkbox" id="driveToggle" onchange="toggleMode(this.checked)">
+                        <div class="bb8-toggle__container">
+                          <div class="bb8-toggle__scenery">
+                            <div class="bb8-toggle__star"></div>
+                            <div class="bb8-toggle__star"></div>
+                            <div class="bb8-toggle__star"></div>
+                            <div class="bb8-toggle__star"></div>
+                            <div class="bb8-toggle__star"></div>
+                            <div class="bb8-toggle__star"></div>
+                            <div class="bb8-toggle__star"></div>
+                            <div class="tatto-1"></div>
+                            <div class="tatto-2"></div>
+                            <div class="gomrassen"></div>
+                            <div class="hermes"></div>
+                            <div class="chenini"></div>
+                            <div class="bb8-toggle__cloud"></div>
+                            <div class="bb8-toggle__cloud"></div>
+                            <div class="bb8-toggle__cloud"></div>
+                          </div>
+                          <div class="bb8">
+                            <div class="bb8__head-container">
+                              <div class="bb8__antenna"></div>
+                              <div class="bb8__antenna"></div>
+                              <div class="bb8__head"></div>
+                            </div>
+                            <div class="bb8__body"></div>
+                          </div>
+                          <div class="artificial__hidden">
+                            <div class="bb8__shadow"></div>
+                          </div>
+                        </div>
+                      </label>
+                    <span style="font-size:13px;color:var(--accent-blue);font-weight:600;">Manual Drive</span>
                 </div>
-                <div id="modeStatus" style="font-size:12px;color:var(--text-muted);margin-top:4px;">Mode: Navigation</div>
+                <div id="modeStatus" style="font-size:12px;color:var(--text-muted);margin-top:4px;">Mode: <span style="color:var(--accent-blue);">Navigation</span></div>
             </div>
 
             <div class="card" id="driveCard" style="display:none;">
@@ -80,7 +102,9 @@ _CONTENT = '''
             <div class="card">
                 <div class="card-header">Dance Maneuver</div>
                 <div style="display:flex;flex-direction:column;gap:8px;">
-                    <button class="button" onclick="sendDance()">Dance</button>
+                    <button class="button" onclick="sendDance()">
+                      Dance
+                    </button>
                     <div id="danceStatus" class="status"></div>
                 </div>
             </div>
@@ -105,24 +129,24 @@ _CONTENT = '''
                     </div>
                 </div>
                 <div class="slider-group">
-                    <div class="slider-label"><span>Saturation Low</span><span style="color:var(--text-muted)">0-255</span></div>
+                    <div class="slider-label"><span>Sat Low</span><span style="color:var(--text-muted)">0-255</span></div>
                     <div class="slider-controls">
                         <input type="range" id="wLowS" min="0" max="255" value="0" class="slider">
                         <input type="number" id="wLowS-input" min="0" max="255" value="0" class="input-box">
                     </div>
                 </div>
                 <div class="slider-group">
-                    <div class="slider-label"><span>Saturation High</span><span style="color:var(--text-muted)">0-255</span></div>
+                    <div class="slider-label"><span>Sat High</span><span style="color:var(--text-muted)">0-255</span></div>
                     <div class="slider-controls">
-                        <input type="range" id="wHighS" min="0" max="255" value="40" class="slider">
-                        <input type="number" id="wHighS-input" min="0" max="255" value="40" class="input-box">
+                        <input type="range" id="wHighS" min="0" max="255" value="255" class="slider">
+                        <input type="number" id="wHighS-input" min="0" max="255" value="255" class="input-box">
                     </div>
                 </div>
                 <div class="slider-group">
                     <div class="slider-label"><span>Value Low</span><span style="color:var(--text-muted)">0-255</span></div>
                     <div class="slider-controls">
-                        <input type="range" id="wLowV" min="0" max="255" value="180" class="slider">
-                        <input type="number" id="wLowV-input" min="0" max="255" value="180" class="input-box">
+                        <input type="range" id="wLowV" min="0" max="255" value="150" class="slider">
+                        <input type="number" id="wLowV-input" min="0" max="255" value="150" class="input-box">
                     </div>
                 </div>
                 <div class="slider-group">
@@ -133,7 +157,7 @@ _CONTENT = '''
                     </div>
                 </div>
 
-                <div class="hsv-section-title yellow" style="margin-top:20px">Yellow Line (left / dashed)</div>
+                <div class="hsv-section-title yellow">Yellow Line (left / dashed)</div>
 
                 <div class="slider-group">
                     <div class="slider-label"><span>Hue Low</span><span style="color:var(--text-muted)">0-179</span></div>
@@ -150,14 +174,14 @@ _CONTENT = '''
                     </div>
                 </div>
                 <div class="slider-group">
-                    <div class="slider-label"><span>Saturation Low</span><span style="color:var(--text-muted)">0-255</span></div>
+                    <div class="slider-label"><span>Sat Low</span><span style="color:var(--text-muted)">0-255</span></div>
                     <div class="slider-controls">
-                        <input type="range" id="yLowS" min="0" max="255" value="80" class="slider">
-                        <input type="number" id="yLowS-input" min="0" max="255" value="80" class="input-box">
+                        <input type="range" id="yLowS" min="0" max="255" value="100" class="slider">
+                        <input type="number" id="yLowS-input" min="0" max="255" value="100" class="input-box">
                     </div>
                 </div>
                 <div class="slider-group">
-                    <div class="slider-label"><span>Saturation High</span><span style="color:var(--text-muted)">0-255</span></div>
+                    <div class="slider-label"><span>Sat High</span><span style="color:var(--text-muted)">0-255</span></div>
                     <div class="slider-controls">
                         <input type="range" id="yHighS" min="0" max="255" value="255" class="slider">
                         <input type="number" id="yHighS-input" min="0" max="255" value="255" class="input-box">
@@ -186,6 +210,155 @@ _CONTENT = '''
 '''
 
 _EXTRA_CSS = '''
+@import url("https://fonts.googleapis.com/css2?family=Patrick+Hand&display=swap");
+
+  background: #fec195;
+  font-size: 17px;
+  font-weight: 500;
+  color: #181818;
+  border: 3px solid #fec195;
+  border-radius: 8px;
+  box-shadow: 0 0 0 #fec1958c;
+  transition: all 0.3s ease-in-out;
+  cursor: pointer;
+}
+
+.dance-btn .star-1 {
+  position: absolute;
+  top: 20%;
+  left: 20%;
+  width: 25px;
+  height: auto;
+  filter: drop-shadow(0 0 0 #fffdef);
+  z-index: -5;
+  transition: all 1s cubic-bezier(0.05, 0.83, 0.43, 0.96);
+}
+
+.dance-btn .star-2 {
+  position: absolute;
+  top: 45%;
+  left: 45%;
+  width: 15px;
+  height: auto;
+  filter: drop-shadow(0 0 0 #fffdef);
+  z-index: -5;
+  transition: all 1s cubic-bezier(0, 0.4, 0, 1.01);
+}
+
+.dance-btn .star-3 {
+  position: absolute;
+  top: 40%;
+  left: 40%;
+  width: 5px;
+  height: auto;
+  filter: drop-shadow(0 0 0 #fffdef);
+  z-index: -5;
+  transition: all 1s cubic-bezier(0, 0.4, 0, 1.01);
+}
+
+.dance-btn .star-4 {
+  position: absolute;
+  top: 20%;
+  left: 40%;
+  width: 8px;
+  height: auto;
+  filter: drop-shadow(0 0 0 #fffdef);
+  z-index: -5;
+  transition: all 0.8s cubic-bezier(0, 0.4, 0, 1.01);
+}
+
+.dance-btn .star-5 {
+  position: absolute;
+  top: 25%;
+  left: 45%;
+  width: 15px;
+  height: auto;
+  filter: drop-shadow(0 0 0 #fffdef);
+  z-index: -5;
+  transition: all 0.6s cubic-bezier(0, 0.4, 0, 1.01);
+}
+
+.dance-btn .star-6 {
+  position: absolute;
+  top: 5%;
+  left: 50%;
+  width: 5px;
+  height: auto;
+  filter: drop-shadow(0 0 0 #fffdef);
+  z-index: -5;
+  transition: all 0.8s ease;
+}
+
+.dance-btn:hover {
+  background: transparent;
+  color: #fec195;
+  box-shadow: 0 0 25px #fec1958c;
+}
+
+.dance-btn:hover .star-1 {
+  position: absolute;
+  top: -80%;
+  left: -30%;
+  width: 25px;
+  height: auto;
+  filter: drop-shadow(0 0 10px #fffdef);
+  z-index: 2;
+}
+
+.dance-btn:hover .star-2 {
+  position: absolute;
+  top: -25%;
+  left: 10%;
+  width: 15px;
+  height: auto;
+  filter: drop-shadow(0 0 10px #fffdef);
+  z-index: 2;
+}
+
+.dance-btn:hover .star-3 {
+  position: absolute;
+  top: 55%;
+  left: 25%;
+  width: 5px;
+  height: auto;
+  filter: drop-shadow(0 0 10px #fffdef);
+  z-index: 2;
+}
+
+.dance-btn:hover .star-4 {
+  position: absolute;
+  top: 30%;
+  left: 80%;
+  width: 8px;
+  height: auto;
+  filter: drop-shadow(0 0 10px #fffdef);
+  z-index: 2;
+}
+
+.dance-btn:hover .star-5 {
+  position: absolute;
+  top: 25%;
+  left: 115%;
+  width: 15px;
+  height: auto;
+  filter: drop-shadow(0 0 10px #fffdef);
+  z-index: 2;
+}
+
+.dance-btn:hover .star-6 {
+  position: absolute;
+  top: 5%;
+  left: 60%;
+  width: 5px;
+  height: auto;
+  filter: drop-shadow(0 0 10px #fffdef);
+  z-index: 2;
+}
+
+.fil0 {
+  fill: #fffdef;
+}
+
 #statusTable .row {
     display: flex;
     justify-content: space-between;
@@ -220,7 +393,7 @@ _EXTRA_CSS = '''
     transition: all 0.1s;
     user-select: none;
 }
-.key-box.active { background: rgba(63,185,80,0.2); border-color: var(--accent-green); color: var(--accent-green); }
+.key-box.active { background: rgba(212,167,44,0.2); border-color: var(--accent-green); color: var(--accent-green); }
 .key-up    { grid-area: up; }
 .key-down  { grid-area: down; }
 .key-left  { grid-area: left; }
@@ -230,7 +403,7 @@ _EXTRA_CSS = '''
 .hsv-section-title.white  { color: #ecf0f1; }
 
 .model-status { padding: 6px 10px; border-radius: 4px; font-size: 12px; }
-.model-status.ok      { background: rgba(63,185,80,0.1);  border: 1px solid rgba(63,185,80,0.3);  color: var(--accent-green); }
+.model-status.ok      { background: rgba(212,167,44,0.1);  border: 1px solid rgba(212,167,44,0.3);  color: var(--accent-green); }
 .model-status.err     { background: rgba(248,81,73,0.1);  border: 1px solid rgba(248,81,73,0.3);  color: var(--accent-red); }
 .model-status.building{ background: rgba(210,153,34,0.1); border: 1px solid rgba(210,153,34,0.3); color: #d6a63a; }
 
@@ -274,7 +447,7 @@ _EXTRA_CSS = '''
     z-index: 5;
 }
 .standalone-tile.start-selected {
-    background: rgba(63, 185, 80, 0.2);
+    background: rgba(212, 167, 44, 0.2);
     outline: 2px solid var(--accent-green);
     z-index: 10;
 }
@@ -378,11 +551,7 @@ fetch('/get_hsv')
 function toggleMode(isManual) {
     manualMode = isManual;
     document.getElementById('driveCard').style.display = isManual ? 'block' : 'none';
-    document.getElementById('modeStatus').textContent = 'Mode: ' + (isManual ? 'Manual Drive' : 'Navigation');
-    document.getElementById('toggleKnob').style.left = isManual ? '26px' : '2px';
-    document.getElementById('toggleSlider').style.background = isManual ? 'rgba(63,185,80,0.3)' : 'var(--bg-sidebar)';
-    document.getElementById('toggleSlider').style.borderColor = isManual ? 'var(--accent-green)' : 'var(--border-color)';
-    document.getElementById('toggleKnob').style.background = isManual ? 'var(--accent-green)' : 'var(--text-muted)';
+    document.getElementById('modeStatus').innerHTML = 'Mode: <span style="color:var(--accent-blue);">' + (isManual ? 'Manual Drive' : 'Navigation') + '</span>';
 
     postJSON('/set_mode', {manual: isManual})
         .catch(() => showStatus('modeStatus', 'Server error', 'error'));

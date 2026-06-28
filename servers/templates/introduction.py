@@ -23,7 +23,7 @@ _EXTRA_CSS = '''
     transition: all 0.1s;
     user-select: none;
 }
-.key-box.active { background: rgba(63,185,80,0.2); border-color: var(--accent-green); color: var(--accent-green); }
+.key-box.active { background: rgba(212,167,44,0.2); border-color: var(--accent-green); color: var(--accent-green); }
 .key-up    { grid-area: up; }
 .key-down  { grid-area: down; }
 .key-left  { grid-area: left; }

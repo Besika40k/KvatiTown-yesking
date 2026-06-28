@@ -180,7 +180,7 @@ _JS = '''
         }
 
         // Origin dot (green)
-        ctx.fillStyle = '#3fb950';
+        ctx.fillStyle = '#d4a72c';
         ctx.beginPath();
         ctx.arc(cx(0), cy(0), 5, 0, Math.PI * 2);
         ctx.fill();
