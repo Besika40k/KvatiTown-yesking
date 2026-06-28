@@ -211,8 +211,6 @@ _CONTENT = '''
 '''
 
 _EXTRA_CSS = '''
-@import url("https://fonts.googleapis.com/css2?family=Patrick+Hand&display=swap");
-
 .premium-btn {
   display: inline-flex;
   align-items: center;
