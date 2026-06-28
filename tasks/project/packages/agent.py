@@ -526,6 +526,16 @@ class NavigationAgent:
             return False
         if (x2 - x1) * (y2 - y1) < OBSTACLE_MIN_AREA:
             return False
+            
+        # Trucks are physically much larger than ducks. For a truck to hit OBSTACLE_MIN_AREA, 
+        # it is still far away. For a duck to hit it, it must be very close. 
+        # Because y2 (bounding box bottom) is highly unreliable for tall objects in 
+        # different orientations (head-on vs crossing), we bypass the depth gate entirely 
+        # for trucks and rely purely on the fact that an area >= 2500px for a truck 
+        # guarantees it is in our immediate two-lane vicinity.
+        if cls_id == 1:
+            return True
+            
         if y2 < h * OBSTACLE_ZONE_Y:
             return False
         cx = (x1 + x2) / 2.0
@@ -565,6 +575,20 @@ class NavigationAgent:
 
     def _update_obstacle(self, detections, w, h, leds):
         """Returns True while the robot should stay stopped for an obstacle."""
+        # [DEBUG] Continuous telemetry for any truck on screen
+        for d in detections:
+            (x1, y1, x2, y2), _score, cls_id = d
+            if cls_id == 1:
+                area = (x2 - x1) * (y2 - y1)
+                is_obst = self._is_obstacle(d, w, h)
+                msg = f"[Telemetry] Truck cx={(x1+x2)/2:.1f} y2={y2}({y2/h:.2f}H) area={area}px | Valid={is_obst} Stopped={self._obstacle_stopped}"
+                print(msg, flush=True)
+                try:
+                    with open("telemetry.log", "a") as f:
+                        f.write(msg + "\n")
+                except Exception:
+                    pass
+
         blocking = [d for d in detections if self._is_obstacle(d, w, h)]
         if blocking:
             self._obstacle_streak += 1

@@ -594,8 +594,8 @@ def get_turn_bias():
 
     return jsonify(
         {
-            "turn_bias_low": _ag.TURN_BIAS_LOW,
-            "turn_bias_high": _ag.TURN_BIAS_HIGH,
+            "turn_bias_low": getattr(_ag, "LEFT_TURN_BIAS_LOW", 0.1),
+            "turn_bias_high": getattr(_ag, "LEFT_TURN_BIAS_HIGH", 2.0),
         }
     )
 
@@ -606,11 +606,17 @@ def set_turn_bias():
 
     data = request.json
     if "turn_bias_low" in data:
-        _ag.TURN_BIAS_LOW = float(data["turn_bias_low"])
+        val = float(data["turn_bias_low"])
+        if hasattr(_ag, "LEFT_TURN_BIAS_LOW"):
+            _ag.LEFT_TURN_BIAS_LOW = val
+            _ag.RIGHT_TURN_BIAS_LOW = val
     if "turn_bias_high" in data:
-        _ag.TURN_BIAS_HIGH = float(data["turn_bias_high"])
+        val = float(data["turn_bias_high"])
+        if hasattr(_ag, "LEFT_TURN_BIAS_HIGH"):
+            _ag.LEFT_TURN_BIAS_HIGH = val
+            _ag.RIGHT_TURN_BIAS_HIGH = val
     print(
-        f"[TurnBias] low={_ag.TURN_BIAS_LOW:.2f} high={_ag.TURN_BIAS_HIGH:.2f}",
+        f"[TurnBias] low={getattr(_ag, 'LEFT_TURN_BIAS_LOW', 0):.2f} high={getattr(_ag, 'LEFT_TURN_BIAS_HIGH', 0):.2f}",
         flush=True,
     )
     return jsonify({"status": "ok"})

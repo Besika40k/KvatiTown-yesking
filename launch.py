@@ -286,7 +286,7 @@ def run_in_simulation(args):
         print(f"  Godot wheel port: {wheel_port}")
     except TimeoutError:
         if godot_process and godot_process.poll() is not None:
-            print("❌ ERROR: Godot exited unexpectedly!")
+            print("ERROR: Godot exited unexpectedly!")
             return 1
         print("  Port file not found, assuming hint port is correct")
         wheel_port = wheel_port_hint

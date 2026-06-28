@@ -95,8 +95,8 @@ def detection_loop():
                 _last_detections = result
 
 
-def _should_stop(detections, frame_h: int):
-    return student_should_stop(detections, frame_h)
+def _should_stop(detections, frame_w: int, frame_h: int):
+    return student_should_stop(detections, frame_w, frame_h)
 
 
 def visualize(frame_bgr):
@@ -106,6 +106,7 @@ def visualize(frame_bgr):
         return draw_status_overlay(frame_bgr, 'Initializing...')
 
     frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
+    oh, ow = frame_bgr.shape[:2]
 
     if det_agent is not None and det_agent.model_loaded:
         try:
@@ -124,7 +125,7 @@ def visualize(frame_bgr):
     elif lane_agent is not None:
         pwm_left, pwm_right = lane_agent.compute_commands(frame_rgb)
 
-        should_stop, reason = _should_stop(detections, det_agent.img_size if det_agent else frame_bgr.shape[0])
+        should_stop, reason = _should_stop(detections, ow, oh)
         _stopped_by_det = should_stop
         _stop_reason    = reason
 

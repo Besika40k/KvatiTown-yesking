@@ -99,16 +99,17 @@ def manual_control_loop():
         time.sleep(0.05)
 
 
-def _should_stop(detections):
+def _should_stop(detections, frame_w, frame_h):
     if det_agent is None:
         return False, ''
-    return student_should_stop(detections, det_agent.img_size)
+    return student_should_stop(detections, frame_w, frame_h)
 
 
 def visualize(frame_rgb):
     global _stopped_by_det, _stop_reason
 
     bgr = cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2BGR)
+    oh, ow = bgr.shape[:2]
 
     if wheels is None:
         return bgr
@@ -130,7 +131,7 @@ def visualize(frame_rgb):
     elif lane_agent is not None:
         pwm_left, pwm_right = lane_agent.compute_commands(frame_rgb)
 
-        should_stop_flag, reason = _should_stop(detections)
+        should_stop_flag, reason = _should_stop(detections, ow, oh)
         _stopped_by_det = should_stop_flag
         _stop_reason    = reason
 
@@ -140,7 +141,6 @@ def visualize(frame_rgb):
             wheels.set_wheels_speed(0.0, 0.0)
 
     if det_agent is not None and det_agent.model_loaded and detections:
-        oh, ow = bgr.shape[:2]
         sx = ow / det_agent.img_size
         sy = oh / det_agent.img_size
         scaled = [((int(x1*sx), int(y1*sy), int(x2*sx), int(y2*sy)), s, c)
