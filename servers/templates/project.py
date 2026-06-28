@@ -42,10 +42,7 @@ _CONTENT = '''
                 </div>
             </div>
 
-            <div class="card">
-                <div class="card-header">Object Detection</div>
-                <div id="model-status" class="model-status building">Loading&hellip;</div>
-            </div>
+
 
             <div class="card">
                 <div class="card-header">Mode</div>
@@ -75,7 +72,7 @@ _CONTENT = '''
                     <div class="key-box key-down"  id="key-down">&#9660;</div>
                     <div class="key-box key-right" id="key-right">&#9654;</div>
                 </div>
-                <p style="text-align:center;font-size:11px;color:var(--text-muted)">Arrow keys or WASD</p>
+                <p style="text-align:center;font-size:11px;color:var(--text-muted)">use arrow keys</p>
             </div>
 
 
@@ -91,52 +88,7 @@ _CONTENT = '''
             <div class="card">
                 <div class="card-header">HSV Color Calibration</div>
 
-                <div class="hsv-section-title yellow">Yellow Line (left / dashed)</div>
-
-                <div class="slider-group">
-                    <div class="slider-label"><span>Hue Low</span><span style="color:var(--text-muted)">0-179</span></div>
-                    <div class="slider-controls">
-                        <input type="range" id="yLowH" min="0" max="179" value="20" class="slider">
-                        <input type="number" id="yLowH-input" min="0" max="179" value="20" class="input-box">
-                    </div>
-                </div>
-                <div class="slider-group">
-                    <div class="slider-label"><span>Hue High</span><span style="color:var(--text-muted)">0-179</span></div>
-                    <div class="slider-controls">
-                        <input type="range" id="yHighH" min="0" max="179" value="40" class="slider">
-                        <input type="number" id="yHighH-input" min="0" max="179" value="40" class="input-box">
-                    </div>
-                </div>
-                <div class="slider-group">
-                    <div class="slider-label"><span>Saturation Low</span><span style="color:var(--text-muted)">0-255</span></div>
-                    <div class="slider-controls">
-                        <input type="range" id="yLowS" min="0" max="255" value="80" class="slider">
-                        <input type="number" id="yLowS-input" min="0" max="255" value="80" class="input-box">
-                    </div>
-                </div>
-                <div class="slider-group">
-                    <div class="slider-label"><span>Saturation High</span><span style="color:var(--text-muted)">0-255</span></div>
-                    <div class="slider-controls">
-                        <input type="range" id="yHighS" min="0" max="255" value="255" class="slider">
-                        <input type="number" id="yHighS-input" min="0" max="255" value="255" class="input-box">
-                    </div>
-                </div>
-                <div class="slider-group">
-                    <div class="slider-label"><span>Value Low</span><span style="color:var(--text-muted)">0-255</span></div>
-                    <div class="slider-controls">
-                        <input type="range" id="yLowV" min="0" max="255" value="100" class="slider">
-                        <input type="number" id="yLowV-input" min="0" max="255" value="100" class="input-box">
-                    </div>
-                </div>
-                <div class="slider-group">
-                    <div class="slider-label"><span>Value High</span><span style="color:var(--text-muted)">0-255</span></div>
-                    <div class="slider-controls">
-                        <input type="range" id="yHighV" min="0" max="255" value="255" class="slider">
-                        <input type="number" id="yHighV-input" min="0" max="255" value="255" class="input-box">
-                    </div>
-                </div>
-
-                <div class="hsv-section-title white" style="margin-top:20px">White Line (right / solid)</div>
+                <div class="hsv-section-title white">White Line (right / solid)</div>
 
                 <div class="slider-group">
                     <div class="slider-label"><span>Hue Low</span><span style="color:var(--text-muted)">0-179</span></div>
@@ -181,6 +133,51 @@ _CONTENT = '''
                     </div>
                 </div>
 
+                <div class="hsv-section-title yellow" style="margin-top:20px">Yellow Line (left / dashed)</div>
+
+                <div class="slider-group">
+                    <div class="slider-label"><span>Hue Low</span><span style="color:var(--text-muted)">0-179</span></div>
+                    <div class="slider-controls">
+                        <input type="range" id="yLowH" min="0" max="179" value="20" class="slider">
+                        <input type="number" id="yLowH-input" min="0" max="179" value="20" class="input-box">
+                    </div>
+                </div>
+                <div class="slider-group">
+                    <div class="slider-label"><span>Hue High</span><span style="color:var(--text-muted)">0-179</span></div>
+                    <div class="slider-controls">
+                        <input type="range" id="yHighH" min="0" max="179" value="40" class="slider">
+                        <input type="number" id="yHighH-input" min="0" max="179" value="40" class="input-box">
+                    </div>
+                </div>
+                <div class="slider-group">
+                    <div class="slider-label"><span>Saturation Low</span><span style="color:var(--text-muted)">0-255</span></div>
+                    <div class="slider-controls">
+                        <input type="range" id="yLowS" min="0" max="255" value="80" class="slider">
+                        <input type="number" id="yLowS-input" min="0" max="255" value="80" class="input-box">
+                    </div>
+                </div>
+                <div class="slider-group">
+                    <div class="slider-label"><span>Saturation High</span><span style="color:var(--text-muted)">0-255</span></div>
+                    <div class="slider-controls">
+                        <input type="range" id="yHighS" min="0" max="255" value="255" class="slider">
+                        <input type="number" id="yHighS-input" min="0" max="255" value="255" class="input-box">
+                    </div>
+                </div>
+                <div class="slider-group">
+                    <div class="slider-label"><span>Value Low</span><span style="color:var(--text-muted)">0-255</span></div>
+                    <div class="slider-controls">
+                        <input type="range" id="yLowV" min="0" max="255" value="100" class="slider">
+                        <input type="number" id="yLowV-input" min="0" max="255" value="100" class="input-box">
+                    </div>
+                </div>
+                <div class="slider-group">
+                    <div class="slider-label"><span>Value High</span><span style="color:var(--text-muted)">0-255</span></div>
+                    <div class="slider-controls">
+                        <input type="range" id="yHighV" min="0" max="255" value="255" class="slider">
+                        <input type="number" id="yHighV-input" min="0" max="255" value="255" class="input-box">
+                    </div>
+                </div>
+
                 <div id="hsv-status" class="status"></div>
             </div>
 
@@ -192,13 +189,14 @@ _EXTRA_CSS = '''
 #statusTable .row {
     display: flex;
     justify-content: space-between;
+    gap: 8px;
     padding: 6px 0;
     border-bottom: 1px solid var(--border-color);
     align-items: baseline;
 }
 #statusTable .row:last-child { border-bottom: none; }
-#statusTable .key  { color: var(--text-secondary); font-size: 12px; }
-#statusTable .val  { color: var(--text-primary);   font-weight: 500; font-size: 13px; font-family: monospace; }
+#statusTable .key  { color: var(--text-secondary); font-size: 12px; flex-shrink: 0; }
+#statusTable .val  { color: var(--text-primary); font-weight: 500; font-size: 13px; font-family: monospace; text-align: right; word-break: break-word; min-width: 0; flex-shrink: 1; }
 
 .key-display {
     display: grid;

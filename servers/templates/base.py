@@ -2,16 +2,16 @@ BASE_CSS = '''
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 :root {
-    --bg-dark: #1a1d23;
-    --bg-darker: #13161a;
-    --bg-sidebar: #0d1117;
-    --border-color: #30363d;
-    --text-primary: #e6edf3;
-    --text-secondary: #8b949e;
-    --text-muted: #6e7681;
-    --accent-blue: #1f6feb;
-    --accent-blue-hover: #388bfd;
-    --accent-green: #3fb950;
+    --bg-dark: #0d0f12;
+    --bg-darker: #23262e;
+    --bg-sidebar: #23262e;
+    --border-color: #696773;
+    --text-primary: #B1B6A6;
+    --text-secondary: #8a9098;
+    --text-muted: #8a9098;
+    --accent-blue: #2EB850;
+    --accent-blue-hover: #3fd061;
+    --accent-green: #2EB850;
     --accent-red: #f85149;
     --accent-purple: #a371f7;
     --accent-orange: #d29922;
@@ -32,7 +32,13 @@ body {
     border-bottom: 1px solid var(--border-color);
 }
 
-h1 { font-size: 24px; font-weight: 600; margin-bottom: 6px; }
+h1 {
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    margin-bottom: 6px;
+    color: var(--text-primary);
+}
 .subtitle { color: var(--text-secondary); font-size: 13px; }
 
 .container {
