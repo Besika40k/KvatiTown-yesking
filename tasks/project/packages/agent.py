@@ -56,8 +56,8 @@ MOTOR_BIAS = 0 if _IS_REAL else 0.0
 # Sim uses a forward arc (both wheels forward, different speeds).
 LEFT_TURN_BIAS_LOW = 0.1 if _IS_REAL else 0.1
 LEFT_TURN_BIAS_HIGH = 1.8 if _IS_REAL else 2
-RIGHT_TURN_BIAS_LOW = 0.1 if _IS_REAL else 0.4
-RIGHT_TURN_BIAS_HIGH = 1.8 if _IS_REAL else 1.4
+RIGHT_TURN_BIAS_LOW = 0.1 if _IS_REAL else 0.1
+RIGHT_TURN_BIAS_HIGH = 1.8 if _IS_REAL else 2
 # Speed while slowly driving over the red stop line before turning
 CREEP_SPEED = 0.25 if not _IS_REAL else 0.3
 
@@ -93,7 +93,7 @@ TURN_TIME_FORWARD = 10 if not _IS_REAL else 1.4
 TURN_TIME_LEFT = 0.5 if not _IS_REAL else 1.4
 
 # Seconds to rotate right at an intersection
-TURN_TIME_RIGHT = 0.35 if not _IS_REAL else 1.05
+TURN_TIME_RIGHT = 0.5 if not _IS_REAL else 1.05
 
 # Seconds to rotate for a U-turn (turnaround). Rotates the same direction as a
 # left turn, just held longer so the robot swings ~180° instead of ~90°.
