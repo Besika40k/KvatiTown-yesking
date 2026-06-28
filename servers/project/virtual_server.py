@@ -347,7 +347,7 @@ def serve_config(filename):
 @app.route("/")
 def index():
     base = HTML_TEMPLATE(
-        title="Navigation — Project",
+        title="Navigation - Project",
         subtitle="Duckiebot navigation task",
     )
     # Inject lane control card CSS + JS
@@ -358,66 +358,7 @@ def index():
 .lane-slider-row input[type=range]{flex:1}
 .lane-slider-row span{min-width:42px;font-size:13px;font-family:monospace;color:var(--text-primary);text-align:right}
 
-.obstacle-card button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  align-self: flex-start;
-  gap: 8px;
-  padding: 0 16px;
-  width: max-content;
-  height: 36px;
-  color: white;
-  text-shadow: 1px 1px rgb(116, 116, 116);
-  text-transform: uppercase;
-  cursor: pointer;
-  border: solid 2px black;
-  letter-spacing: 1px;
-  font-weight: 600;
-  font-size: 14px;
-  background-color: hsl(49deg 98% 60%);
-  border-radius: 50px;
-  position: relative;
-  overflow: hidden;
-  transition: all 0.5s ease;
-}
 
-.obstacle-card button:active {
-  transform: scale(0.9);
-  transition: all 100ms ease;
-}
-
-.obstacle-card button svg {
-  transition: all 0.5s ease;
-  z-index: 2;
-}
-
-.obstacle-card .play {
-  transition: all 0.5s ease;
-  transition-delay: 300ms;
-}
-
-.obstacle-card button:hover svg {
-  transform: scale(3) translate(50%);
-}
-
-.obstacle-card .now {
-  position: absolute;
-  left: 0;
-  transform: translateX(-100%);
-  transition: all 0.5s ease;
-  z-index: 2;
-}
-
-.obstacle-card button:hover .now {
-  transform: translateX(10px);
-  transition-delay: 300ms;
-}
-
-.obstacle-card button:hover .play {
-  transform: translateX(200%);
-  transition-delay: 300ms;
-}
 </style>
 <script>
 function injectLaneCard(){const e=[...document.querySelectorAll('.card')].find(c=>c.querySelector('.card-header')?.textContent?.includes('Dance'));if(!e)return;const d=document.createElement('div');d.className='card';d.innerHTML=`<div class="card-header">Lane Control</div><div class="lane-slider-group"><div class="lane-slider-row"><label>P Gain</label><input type="range" class="slider" id="lc-p" min="0" max="2" step="0.05" value="0.6" oninput="document.getElementById('lc-p-v').textContent=parseFloat(this.value).toFixed(2);applyLaneConfig()"><span id="lc-p-v">0.60</span></div></div><div class="lane-slider-group"><div class="lane-slider-row"><label>D Gain</label><input type="range" class="slider" id="lc-d" min="0" max="3" step="0.05" value="0.8" oninput="document.getElementById('lc-d-v').textContent=parseFloat(this.value).toFixed(2);applyLaneConfig()"><span id="lc-d-v">0.80</span></div></div><div class="lane-slider-group"><div class="lane-slider-row"><label>Base Speed</label><input type="range" class="slider" id="lc-s" min="0.02" max="0.4" step="0.01" value="0.08" oninput="document.getElementById('lc-s-v').textContent=parseFloat(this.value).toFixed(2);applyLaneConfig()"><span id="lc-s-v">0.08</span></div></div><div id="lc-status" class="status"></div>`;e.parentNode.insertBefore(d,e);if(window.updateSliderFill) d.querySelectorAll('.slider').forEach(updateSliderFill);fetch('/get_lane_config').then(r=>r.json()).then(d=>{document.getElementById('lc-p').value=d.p_gain;document.getElementById('lc-p-v').textContent=d.p_gain.toFixed(2);if(window.updateSliderFill)updateSliderFill(document.getElementById('lc-p'));document.getElementById('lc-d').value=d.d_gain;document.getElementById('lc-d-v').textContent=d.d_gain.toFixed(2);if(window.updateSliderFill)updateSliderFill(document.getElementById('lc-d'));document.getElementById('lc-s').value=d.base_speed;document.getElementById('lc-s-v').textContent=d.base_speed.toFixed(2);if(window.updateSliderFill)updateSliderFill(document.getElementById('lc-s'));}).catch(()=>{})}
@@ -429,7 +370,7 @@ document.readyState==='loading'?document.addEventListener('DOMContentLoaded',inj
 function injectBiasCard(){const e=[...document.querySelectorAll('.card')].find(c=>c.querySelector('.card-header')?.textContent?.includes('Dance'));if(!e)return;const d=document.createElement('div');d.className='card';d.innerHTML=`<div class="card-header">Turn Bias</div><div class="lane-slider-group"><div class="lane-slider-row"><label>Inner (low)</label><input type="range" class="slider" id="bc-low" min="-1" max="1" step="0.05" value="0.1" oninput="document.getElementById('bc-low-v').textContent=parseFloat(this.value).toFixed(2);applyBiasConfig()"><span id="bc-low-v">0.10</span></div></div><div class="lane-slider-group"><div class="lane-slider-row"><label>Outer (high)</label><input type="range" class="slider" id="bc-high" min="0" max="2" step="0.05" value="1.8" oninput="document.getElementById('bc-high-v').textContent=parseFloat(this.value).toFixed(2);applyBiasConfig()"><span id="bc-high-v">1.80</span></div></div><div id="bc-status" class="status"></div>`;e.parentNode.insertBefore(d,e);if(window.updateSliderFill) d.querySelectorAll('.slider').forEach(updateSliderFill);fetch('/get_turn_bias').then(r=>r.json()).then(cfg=>{document.getElementById('bc-low').value=cfg.turn_bias_low;document.getElementById('bc-low-v').textContent=cfg.turn_bias_low.toFixed(2);if(window.updateSliderFill)updateSliderFill(document.getElementById('bc-low'));document.getElementById('bc-high').value=cfg.turn_bias_high;document.getElementById('bc-high-v').textContent=cfg.turn_bias_high.toFixed(2);if(window.updateSliderFill)updateSliderFill(document.getElementById('bc-high'));}).catch(()=>{})}
 function applyBiasConfig(){postJSON('/set_turn_bias',{turn_bias_low:parseFloat(document.getElementById('bc-low').value),turn_bias_high:parseFloat(document.getElementById('bc-high').value)}).then(()=>showStatus('bc-status','Applied!','success')).catch(()=>showStatus('bc-status','Error','error'))}
 document.readyState==='loading'?document.addEventListener('DOMContentLoaded',injectBiasCard):injectBiasCard();
-function injectObstacleCard(){const e=[...document.querySelectorAll('.card')].find(c=>c.querySelector('.card-header')?.textContent?.includes('Dance'));if(!e)return;const d=document.createElement('div');d.className='card obstacle-card';d.innerHTML=`<div class="card-header">Obstacle Management</div><div style="display:flex;flex-direction:column;gap:8px;"><button onclick="removeObjects('duckie')"><svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg><span class="now">now!</span><span class="play">Remove Obstacles</span></button></div>`;e.parentNode.insertBefore(d,e);}
+function injectObstacleCard(){const e=[...document.querySelectorAll('.card')].find(c=>c.querySelector('.card-header')?.textContent?.includes('Dance'));if(!e)return;const d=document.createElement('div');d.className='card obstacle-card';d.innerHTML=`<div class="card-header">Obstacle Management</div><div style="display:flex;justify-content:center;width:100%;"><button class="premium-btn" onclick="removeObjects('duckie')"><svg viewBox="0 0 24 24" width="16" height="16" style="fill:currentColor;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Remove Obstacles</button></div>`;e.parentNode.insertBefore(d,e);}
 function removeObjects(filter){postJSON('/remove_objects',{filter:filter}).then(()=>console.log('Obstacles removed')).catch(e=>console.error(e));}
 document.readyState==='loading'?document.addEventListener('DOMContentLoaded',injectObstacleCard):injectObstacleCard();
 </script>"""

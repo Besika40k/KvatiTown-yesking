@@ -272,7 +272,7 @@ def serve_config(filename):
 @app.route("/")
 def index():
     base = HTML_TEMPLATE(
-        title="Navigation — Project",
+        title="Navigation - Project",
         subtitle="Real Duckiebot",
     )
     # Inject lane control card CSS + JS

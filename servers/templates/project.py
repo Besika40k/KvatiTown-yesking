@@ -101,12 +101,13 @@ _CONTENT = '''
 
             <div class="card">
                 <div class="card-header">Dance Maneuver</div>
-                <div style="display:flex;flex-direction:column;gap:8px;">
-                    <button class="button" onclick="sendDance()">
+                <div style="display:flex;justify-content:center;width:100%;">
+                    <button class="premium-btn" onclick="sendDance()">
+                      <svg viewBox="0 0 24 24" width="16" height="16" style="fill:currentColor;"><path d="M8 5v14l11-7z"/></svg>
                       Dance
                     </button>
-                    <div id="danceStatus" class="status"></div>
                 </div>
+                <div id="danceStatus" class="status"></div>
             </div>
 
             <div class="card">
@@ -212,151 +213,48 @@ _CONTENT = '''
 _EXTRA_CSS = '''
 @import url("https://fonts.googleapis.com/css2?family=Patrick+Hand&display=swap");
 
-  background: #fec195;
-  font-size: 17px;
-  font-weight: 500;
-  color: #181818;
-  border: 3px solid #fec195;
-  border-radius: 8px;
-  box-shadow: 0 0 0 #fec1958c;
-  transition: all 0.3s ease-in-out;
+.premium-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  max-width: 220px;
+  height: 40px;
+  background: var(--bg-sidebar);
+  color: var(--text-primary);
+  border: 2px solid var(--accent-blue);
+  border-radius: 6px;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
   cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+  margin: 0 auto;
 }
 
-.dance-btn .star-1 {
-  position: absolute;
-  top: 20%;
-  left: 20%;
-  width: 25px;
-  height: auto;
-  filter: drop-shadow(0 0 0 #fffdef);
-  z-index: -5;
-  transition: all 1s cubic-bezier(0.05, 0.83, 0.43, 0.96);
+.premium-btn:hover {
+  background: var(--accent-blue);
+  color: #12131a;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(212, 167, 44, 0.35);
 }
 
-.dance-btn .star-2 {
-  position: absolute;
-  top: 45%;
-  left: 45%;
-  width: 15px;
-  height: auto;
-  filter: drop-shadow(0 0 0 #fffdef);
-  z-index: -5;
-  transition: all 1s cubic-bezier(0, 0.4, 0, 1.01);
+.premium-btn:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 2px rgba(212, 167, 44, 0.1);
+  transition-duration: 50ms;
 }
 
-.dance-btn .star-3 {
-  position: absolute;
-  top: 40%;
-  left: 40%;
-  width: 5px;
-  height: auto;
-  filter: drop-shadow(0 0 0 #fffdef);
-  z-index: -5;
-  transition: all 1s cubic-bezier(0, 0.4, 0, 1.01);
+.premium-btn svg {
+  transition: transform 0.2s ease;
 }
 
-.dance-btn .star-4 {
-  position: absolute;
-  top: 20%;
-  left: 40%;
-  width: 8px;
-  height: auto;
-  filter: drop-shadow(0 0 0 #fffdef);
-  z-index: -5;
-  transition: all 0.8s cubic-bezier(0, 0.4, 0, 1.01);
-}
-
-.dance-btn .star-5 {
-  position: absolute;
-  top: 25%;
-  left: 45%;
-  width: 15px;
-  height: auto;
-  filter: drop-shadow(0 0 0 #fffdef);
-  z-index: -5;
-  transition: all 0.6s cubic-bezier(0, 0.4, 0, 1.01);
-}
-
-.dance-btn .star-6 {
-  position: absolute;
-  top: 5%;
-  left: 50%;
-  width: 5px;
-  height: auto;
-  filter: drop-shadow(0 0 0 #fffdef);
-  z-index: -5;
-  transition: all 0.8s ease;
-}
-
-.dance-btn:hover {
-  background: transparent;
-  color: #fec195;
-  box-shadow: 0 0 25px #fec1958c;
-}
-
-.dance-btn:hover .star-1 {
-  position: absolute;
-  top: -80%;
-  left: -30%;
-  width: 25px;
-  height: auto;
-  filter: drop-shadow(0 0 10px #fffdef);
-  z-index: 2;
-}
-
-.dance-btn:hover .star-2 {
-  position: absolute;
-  top: -25%;
-  left: 10%;
-  width: 15px;
-  height: auto;
-  filter: drop-shadow(0 0 10px #fffdef);
-  z-index: 2;
-}
-
-.dance-btn:hover .star-3 {
-  position: absolute;
-  top: 55%;
-  left: 25%;
-  width: 5px;
-  height: auto;
-  filter: drop-shadow(0 0 10px #fffdef);
-  z-index: 2;
-}
-
-.dance-btn:hover .star-4 {
-  position: absolute;
-  top: 30%;
-  left: 80%;
-  width: 8px;
-  height: auto;
-  filter: drop-shadow(0 0 10px #fffdef);
-  z-index: 2;
-}
-
-.dance-btn:hover .star-5 {
-  position: absolute;
-  top: 25%;
-  left: 115%;
-  width: 15px;
-  height: auto;
-  filter: drop-shadow(0 0 10px #fffdef);
-  z-index: 2;
-}
-
-.dance-btn:hover .star-6 {
-  position: absolute;
-  top: 5%;
-  left: 60%;
-  width: 5px;
-  height: auto;
-  filter: drop-shadow(0 0 10px #fffdef);
-  z-index: 2;
-}
-
-.fil0 {
-  fill: #fffdef;
+.premium-btn:hover svg {
+  transform: scale(1.15) rotate(-5deg);
 }
 
 #statusTable .row {
@@ -463,6 +361,53 @@ _EXTRA_CSS = '''
 .standalone-tile.valid-tile:hover {
     background: rgba(31, 111, 235, 0.2);
     outline: 1px solid var(--accent-blue);
+}
+
+#star-field {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: -1;
+  overflow: hidden;
+}
+
+.star {
+  position: absolute;
+  background-color: #fff;
+  border-radius: 50%;
+  opacity: 0;
+  animation: twinkle var(--duration, 3s) infinite ease-in-out var(--delay, 0s);
+}
+
+@keyframes twinkle {
+  0%, 100% { opacity: 0; transform: scale(0.5); }
+  50% { opacity: var(--max-opacity, 0.8); transform: scale(1); }
+}
+
+/* Custom scrollbar for controls column */
+.controls-section::-webkit-scrollbar {
+  width: 8px;
+}
+.controls-section::-webkit-scrollbar-track {
+  background: var(--bg-dark);
+  border-radius: 4px;
+}
+.controls-section::-webkit-scrollbar-thumb {
+  background: #3e424e;
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  transition: background 0.2s ease;
+}
+.controls-section::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-blue);
+  border-color: var(--accent-blue-hover);
+}
+.controls-section {
+  scrollbar-width: thin;
+  scrollbar-color: #3e424e var(--bg-dark);
 }
 '''
 
@@ -764,6 +709,50 @@ document.addEventListener("DOMContentLoaded", () => {
 
             gridOverlay.appendChild(tile);
         }
+    }
+
+    // Prepend gold-filtered crown logo next to the title
+    const h1 = document.querySelector('.header h1');
+    if (h1) {
+        const logo = document.createElement('img');
+        logo.src = 'https://images.vexels.com/media/users/3/246966/isolated/preview/850b9d596ac1e333e477ef721141b9de-fleur-de-lis-king-crown.png';
+        logo.alt = 'Crown Logo';
+        logo.style.height = '48px'; // Slightly taller as this asset looks better larger
+        logo.style.verticalAlign = 'middle';
+        
+        h1.insertBefore(logo, h1.firstChild);
+        h1.style.display = 'flex';
+        h1.style.alignItems = 'center';
+        h1.style.justifyContent = 'center';
+        h1.style.gap = '12px';
+    }
+
+    // Twinkling stars generation
+    const starField = document.createElement('div');
+    starField.id = 'star-field';
+    document.body.appendChild(starField);
+
+    const starCount = 200;
+    for (let i = 0; i < starCount; i++) {
+        const star = document.createElement('div');
+        star.className = 'star';
+        
+        const size = Math.random() * 4 + 2;
+        const x = Math.random() * 100;
+        const y = Math.random() * 100;
+        const duration = Math.random() * 4 + 2;
+        const delay = Math.random() * 5;
+        const maxOpacity = Math.random() * 0.7 + 0.3;
+
+        star.style.width = size + 'px';
+        star.style.height = size + 'px';
+        star.style.left = x + 'vw';
+        star.style.top = y + 'vh';
+        star.style.setProperty('--duration', duration + 's');
+        star.style.setProperty('--delay', delay + 's');
+        star.style.setProperty('--max-opacity', maxOpacity);
+
+        starField.appendChild(star);
     }
 });
 '''
