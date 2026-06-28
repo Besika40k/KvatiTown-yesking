@@ -101,13 +101,12 @@ _CONTENT = '''
 
             <div class="card">
                 <div class="card-header">Dance Maneuver</div>
-                <div style="display:flex;justify-content:center;width:100%;">
-                    <button class="premium-btn" onclick="sendDance()">
-                      <svg viewBox="0 0 24 24" width="16" height="16" style="fill:currentColor;"><path d="M8 5v14l11-7z"/></svg>
+                <div style="display:flex;flex-direction:column;gap:8px;">
+                    <button class="button" onclick="sendDance()">
                       Dance
                     </button>
+                    <div id="danceStatus" class="status"></div>
                 </div>
-                <div id="danceStatus" class="status"></div>
             </div>
 
             <div class="card">
@@ -211,49 +210,6 @@ _CONTENT = '''
 '''
 
 _EXTRA_CSS = '''
-.premium-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  width: 100%;
-  max-width: 220px;
-  height: 40px;
-  background: var(--bg-sidebar);
-  color: var(--text-primary);
-  border: 2px solid var(--accent-blue);
-  border-radius: 6px;
-  font-family: 'Inter', sans-serif;
-  font-size: 13px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
-  margin: 0 auto;
-}
-
-.premium-btn:hover {
-  background: var(--accent-blue);
-  color: #12131a;
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(212, 167, 44, 0.35);
-}
-
-.premium-btn:active {
-  transform: translateY(1px);
-  box-shadow: 0 1px 2px rgba(212, 167, 44, 0.1);
-  transition-duration: 50ms;
-}
-
-.premium-btn svg {
-  transition: transform 0.2s ease;
-}
-
-.premium-btn:hover svg {
-  transform: scale(1.15) rotate(-5deg);
-}
 
 #statusTable .row {
     display: flex;
